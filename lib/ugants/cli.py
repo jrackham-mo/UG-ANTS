@@ -55,14 +55,23 @@ def run(recipe):  # noqa: D103
     print(recipe)
     app = importlib.import_module(recipe["ugants"]["app"])
 
-    loaded_inputs = {}
-    for input_name, input_handler in app.INPUTS.items():
-        recipe_value = recipe["ugants.inputs"][input_name]
-        constraint = recipe["ugants.constraints"].get(input_name, None)
-        loaded_input = input_handler.load(recipe_value, constraint)
-        loaded_inputs[input_name] = loaded_input
+    loaded_sources = {}
+    for source_name, source_loader in app.SOURCES.items():
+        recipe_value = recipe["ugants.sources"][source_name]
+        constraint = recipe["ugants.constraints"].get(source_name, None)
+        loaded_source = source_loader.load(recipe_value, constraint)
+        loaded_sources[source_name] = loaded_source
 
-    outputs = app.main(**loaded_inputs)
+    settings = {}
+    for setting_name, setting_parser in app.SETTINGS.items():
+        recipe_value = recipe["ugants.settings"][setting_name]
+        parsed_setting = setting_parser.parse(recipe_value)
+        settings[setting_name] = parsed_setting
+
+    kwargs = loaded_sources | settings
+
+    print("Parsed recipe:\n", kwargs)
+    outputs = app.main(**kwargs)
 
     for output_name, output_handler in app.OUTPUTS.items():
         output = outputs[output_name]
