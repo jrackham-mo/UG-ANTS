@@ -9,6 +9,12 @@ import pytest
 from ugants.analysis.fill import fill_cube
 from ugants.tests import stock
 
+pytestmark = pytest.mark.filterwarnings(
+    "ignore:Assuming a spherical geocentric coordinate system for conversion to "
+    "3D cartesian coordinates. If the provided cube is not defined on this "
+    "coordinate system then unexpected results may occur.:UserWarning",
+)
+
 
 @pytest.fixture()
 def source_cube_1d():
