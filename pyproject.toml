@@ -16,7 +16,7 @@ classifiers = [
 Homepage = "https://github.com/MetOffice/UG-ANTS"
 
 [project.scripts]
-ugants = "ugants.cli:main"
+ugants = "ugants.application.cli:main"
 
 [build-system]
 # Minimum requirements for the build system to execute, defined by PEP 518.
