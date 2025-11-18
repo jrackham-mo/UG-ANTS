@@ -10,6 +10,7 @@ ugants --help
 import argparse
 import configparser
 import importlib
+import os
 import pathlib
 
 import yaml
@@ -57,13 +58,15 @@ def run(recipe):  # noqa: D103
     loaded_sources = {}
     for source_name, source_loader in app.SOURCES.items():
         recipe_value = recipe["ugants.sources"][source_name]
-        constraint = recipe["ugants.constraints"].get(source_name, None)
+        recipe_value = os.path.expandvars(recipe_value)
+        constraint = recipe.get("ugants.constraints", {}).get(source_name, None)
         loaded_source = source_loader.load(recipe_value, constraint)
         loaded_sources[source_name] = loaded_source
 
     settings = {}
     for setting_name, setting_parser in app.SETTINGS.items():
         recipe_value = recipe["ugants.settings"][setting_name]
+        recipe_value = os.path.expandvars(recipe_value)
         parsed_setting = setting_parser.parse(recipe_value)
         settings[setting_name] = parsed_setting
 
@@ -75,6 +78,7 @@ def run(recipe):  # noqa: D103
     for output_name, output_handler in app.OUTPUTS.items():
         output = outputs[output_name]
         destination = recipe["ugants.outputs"][output_name]
+        destination = os.path.expandvars(destination)
         output_handler.save(output, destination)
 
 

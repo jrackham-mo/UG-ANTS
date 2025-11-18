@@ -24,9 +24,10 @@ class Source(abc.ABC):
 
 
 class NetCDFSource(Source):  # noqa: D101
-    def __init__(self, ugrid=True, constraint=None):
+    def __init__(self, ugrid=True, constraint=None, single_cube=False):
         self.ugrid = ugrid
         self.constraint = constraint
+        self.single_cube = single_cube
         if constraint is None:
             self.constraint = iris.Constraint()
 
@@ -37,6 +38,12 @@ class NetCDFSource(Source):  # noqa: D101
             source = ugants.io.load.ugrid(filepath, constraint)
         else:
             source = ugants.io.load.cf(filepath, constraints=constraint)
+
+        if self.single_cube:
+            if len(source) != 1:
+                raise ValueError(f"Expected 1 cube, got {len(source)}")
+            source = source[0]
+
         return source
 
 
