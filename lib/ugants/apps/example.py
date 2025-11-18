@@ -5,8 +5,7 @@
 from collections import UserDict
 
 import iris
-import ugants.io.save
-from ugants.application import sources
+from ugants.application import outputs, sources
 
 
 class Settings(UserDict):  # noqa: D101
@@ -18,10 +17,6 @@ class Setting:
 
     def parse(self, value):  # noqa: D102
         return value
-
-
-class Outputs(UserDict):  # noqa: D101
-    pass
 
 
 class ChoiceOf(Setting):
@@ -62,11 +57,6 @@ class BoolSetting(Setting):
         return bool(value)
 
 
-class NetCDFOutput:  # noqa: D101
-    def save(self, cube, filepath):  # noqa: D102
-        ugants.io.save.ugrid(cube, filepath)
-
-
 _latitude_constraint = iris.Constraint(latitude=lambda y: y > 0)
 SOURCES = sources.Sources(
     structured_source=sources.NetCDFSource(
@@ -80,10 +70,10 @@ SETTINGS = Settings(
     scheme=ChoiceOf("a", "b"), a_float=FloatSetting(), an_int=IntSetting()
 )
 
-OUTPUTS = Outputs(result=NetCDFOutput())
+OUTPUTS = outputs.Outputs(result=outputs.NetCDFOutput())
 
 
 def main(  # noqa: D103
     structured_source, ugrid_source, target, scheme, a_float, an_int
 ):
-    return Outputs(result=ugrid_source)
+    return outputs.Outputs(result=ugrid_source)
