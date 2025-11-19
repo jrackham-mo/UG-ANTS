@@ -22,6 +22,11 @@ class Source(abc.ABC):
         """Load a source from file, with a constraint."""
         pass
 
+    @property
+    def example_value(self):
+        """Return value that would be added to an example recipe."""
+        return ""
+
 
 class NetCDFSource(Source):  # noqa: D101
     def __init__(self, ugrid=True, constraint=None, single_cube=False):

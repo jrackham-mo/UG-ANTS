@@ -12,6 +12,7 @@ import configparser
 import importlib
 import os
 import pathlib
+import sys
 
 import yaml
 from ugants import __version__
@@ -23,7 +24,8 @@ def resolve_path(filepath: str):  # noqa: D103
     return path
 
 
-def load_recipe(filepath: pathlib.Path):  # noqa: D103
+def load_recipe(filepath: str):  # noqa: D103
+    filepath = resolve_path(filepath)
     print(f"Reading recipe from {filepath}")
     match filepath.suffix:
         case ".yml" | ".yaml":
@@ -82,28 +84,56 @@ def run(recipe):  # noqa: D103
         output_handler.save(output, destination)
 
 
+def recipe_gen(app_module):
+    """Generate a blank recipe file consistent with the given app."""
+    app = importlib.import_module(app_module)
+    recipe = configparser.ConfigParser()
+
+    recipe.add_section("ugants")
+    recipe["ugants"]["app"] = app_module
+
+    recipe.add_section("ugants.sources")
+    for source_name, source_handler in app.SOURCES.items():
+        recipe["ugants.sources"][source_name] = source_handler.example_value
+
+    recipe.write(sys.stdout)
+
+
 def main():  # noqa: D103
     parser = argparse.ArgumentParser()
     parser.add_argument("--version", action="version", version=__version__)
     subparsers = parser.add_subparsers(title="subcommands")
 
+    # Set up "run" subparser
     run_help = "Run a UG-ANTS application"
     run_subparser = subparsers.add_parser("run", help=run_help, description=run_help)
     run_subparser.add_argument(
-        "recipe", help="Path to a recipe file to run", type=resolve_path
+        "recipe", help="Path to a recipe file to run", type=load_recipe
     )
     run_subparser.set_defaults(func=run)
 
+    # Set up "validate" subparser
     validate_help = "Validate a UG-ANTS recipe"
     validate_subparser = subparsers.add_parser(
         "validate", help=validate_help, description=validate_help
     )
     validate_subparser.add_argument(
-        "recipe", help="Path to a recipe file to validate", type=resolve_path
+        "recipe", help="Path to a recipe file to validate", type=load_recipe
     )
     validate_subparser.set_defaults(func=validate)
 
-    args = parser.parse_args()
-    recipe = load_recipe(args.recipe)
+    # Set up "recipe-gen" subparser
+    recipe_gen_help = "Generate a blank recipe for an app"
+    recipe_gen_subparser = subparsers.add_parser(
+        "recipe-gen", help=recipe_gen_help, description=recipe_gen_help
+    )
+    recipe_gen_subparser.add_argument(
+        "app_module", help="Python module defining the app"
+    )
+    recipe_gen_subparser.set_defaults(func=recipe_gen)
 
-    args.func(recipe)
+    args = parser.parse_args()
+    kwargs = vars(args)
+    func = kwargs.pop("func")
+
+    func(**kwargs)
