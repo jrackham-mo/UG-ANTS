@@ -10,6 +10,7 @@ ugants --help
 import argparse
 import configparser
 import importlib
+import inspect
 import os
 import pathlib
 import sys
@@ -59,10 +60,12 @@ def run(recipe):  # noqa: D103
 
     loaded_sources = {}
     for source_name, source_loader in app.SOURCES.items():
-        recipe_value = recipe["ugants.sources"][source_name]
-        recipe_value = os.path.expandvars(recipe_value)
-        constraint = recipe.get("ugants.constraints", {}).get(source_name, None)
-        loaded_source = source_loader.load(recipe_value, constraint)
+        source_section = f"ugants.sources.{source_name}"
+        source_load_kwargs = {
+            key: os.path.expandvars(value)
+            for key, value in recipe[source_section].items()
+        }
+        loaded_source = source_loader(**source_load_kwargs)
         loaded_sources[source_name] = loaded_source
 
     settings = {}
@@ -87,16 +90,26 @@ def run(recipe):  # noqa: D103
 def recipe_gen(app_module):
     """Generate a blank recipe file consistent with the given app."""
     app = importlib.import_module(app_module)
-    recipe = configparser.ConfigParser()
+    recipe = configparser.ConfigParser(allow_no_value=True)
 
     recipe.add_section("ugants")
     recipe["ugants"]["app"] = app_module
 
-    recipe.add_section("ugants.sources")
     for source_name, source_handler in app.SOURCES.items():
-        recipe["ugants.sources"][source_name] = source_handler.example_value
+        source_name_section = f"ugants.sources.{source_name}"
+        recipe.add_section(source_name_section)
+        recipe.set(source_name_section, "# Configure your sources here")
+        for arg_name, parameter in inspect.signature(source_handler).parameters.items():
+            recipe[source_name_section][arg_name] = _gen_entry(parameter)
 
     recipe.write(sys.stdout)
+
+
+def _gen_entry(param: inspect.Parameter):
+    if param.default == param.empty:
+        return f"<{param.name}> # (required)"
+    else:
+        return f"<{param.name}> # (optional, default is {param.default})"
 
 
 def main():  # noqa: D103
