@@ -15,7 +15,9 @@ def load_land_fraction(filepath, an_arg, another="foo"):
     return cubes.extract_cube("land_area_fraction")
 
 
-SOURCES = sources.Sources(land_fraction=load_land_fraction)
+SOURCES = sources.Sources(
+    land_fraction=load_land_fraction, another=ugants.io.load.ugrid
+)
 SETTINGS = settings.Settings(mask_type=settings.ChoiceOf("land", "sea"))
 OUTPUTS = outputs.Outputs(result=outputs.NetCDFOutput())
 
