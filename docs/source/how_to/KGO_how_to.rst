@@ -22,7 +22,7 @@ Source data must first be added, see :ref:`managing-sources`.
 Initial setup
 -------------
 
-Before running the rose stem suite, the environment variable
+Before running the rose stem workflow, the environment variable
 ``UG_ANTS_KGO_DIRECTORY_DEFAULT`` needs to be set to point to a suitable central
 location for the :ref:`KGO directory <KGO-directory-structure>` corresponding
 to the version of UG-ANTS being installed.  The following steps will populate
@@ -30,24 +30,29 @@ this directory with site specific KGO files.  A version specific module file,
 site-specific ``ug-ants-launch`` script, or any other appropriate method can be
 used for setting the environment variable.
 
-After installing UG-ANTS, and confirming the unittests pass, the rose stem suite
+After installing UG-ANTS, and confirming the unittests pass, the rose stem workflow
 can be used to bootstrap a set of KGO files to protect against future changes.
 
-To do this, run the rose stem suite::
+To do this, run the rose stem workflow:
+
+.. versionchanged:: 0.4.0
+   The rose stem workflow is now run via ``cylc vip`` rather than ``rose stem``.
+
+.. code-block::
 
   $ cd <working copy>
   $ cylc vip ./rose-stem -z group=all
 
-
-The rose stem tasks in the suite will fail, since there are no KGOs yet.  Wait
-for the suite to complete, and then run::
+The rose stem tasks in the workflow will fail, since there are no KGOs yet.  Wait
+for the workflow to complete, and then run::
 
   $ cp -r ~/cylc-run/generate_KGOs/runN/share/data/* $UG_ANTS_KGO_DIRECTORY_DEFAULT
 
-At this point, re-running the rose stem suite should result in a passing suite.
+At this point, re-running the rose stem workflow should result in a passing workflow.
 
-This process should be repeated for contrib, with the
-``UG_CONTRIB_KGO_DIRECTORY_DEFAULT`` environment variable.
+This process should be repeated for ``ug-ancillary-file-science``, with the
+``UG_CONTRIB_KGO_DIRECTORY_DEFAULT`` environment variable. The contrib part
+of the name is legacy and may change in a future release.
 
 .. _KGO-directory-structure:
 
@@ -57,7 +62,8 @@ KGO directory structure
 It is recommended to keep a complete set of KGOs for the current release.  It
 may also be necessary to store a set of KGOs for head of trunk, and a number
 of previous releases.  The following directory structure is suggested for UG-ANTS
-core and contrib::
+core and ``ug-ancillary-file-science`` (using the legacy contrib name for
+consistency with existing installations)::
 
   UG-ANTS
     ├── developer

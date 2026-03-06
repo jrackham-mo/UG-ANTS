@@ -23,8 +23,8 @@ Contents:
    tutorials.rst
    how_to.rst
    contributing.rst
-   appendixA_CLA.rst
    release_notes/index.rst
+   Accessibility Statement <accessibility.rst>
 
 Indices and tables
 ==================
