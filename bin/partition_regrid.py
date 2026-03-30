@@ -8,11 +8,66 @@
 """Regrid using iris-esmf-regrid's partitioned regridder."""
 
 import argparse
+import multiprocessing
+import os
 
+import dask.bag
 import esmf_regrid
 import iris
 import iris.mesh
 from esmf_regrid.experimental.partition import Partition
+
+
+class MultiPartition(Partition):
+    """Extend the default partition class to parallelise the weights calculation."""
+
+    def generate_files(self, files_to_generate=None):
+        """Generate files with regridding information.
+
+        Parameters
+        ----------
+        files_to_generate : int, default=None
+            Specify the number of files to generate, default behaviour is to generate all files.
+        """  # noqa: E501
+        if files_to_generate is None:
+            files = self.unsaved_files
+        else:
+            if not isinstance(files_to_generate, int):
+                msg = "`files_to_generate` must be an integer."
+                raise ValueError(msg)
+            files = self.unsaved_files[:files_to_generate]
+
+        src_blocks = [self.file_block_dict[file] for file in files]
+        cpu_count = multiprocessing.cpu_count()
+
+        # .. or as given by slurm allocation.
+        # Only relevant when using Slurm for job scheduling
+        if "SLURM_NTASKS" in os.environ:
+            cpu_count = os.environ["SLURM_NTASKS"]
+
+        # Do not exceed the number of CPUs available, leaving 1 for the system.
+        num_workers = cpu_count - 1
+        print(f"Using {num_workers} workers from {cpu_count} CPUs...")
+
+        # Now do the parallel regrid
+        with dask.config.set(num_workers=num_workers):
+            file_bag = dask.bag.from_sequence(zip(files, src_blocks, strict=True))
+            self.saved_files = file_bag.starmap(
+                _generate_regrid_weights, src=self.src, tgt=self.tgt, scheme=self.scheme
+            ).compute(scheduler="synchronous")
+
+
+def _generate_regrid_weights(file, src_block, src, tgt, scheme):
+    src = esmf_regrid.experimental.partition._get_chunk(src, src_block)
+    regridder = scheme.regridder(src, tgt)
+    weights = regridder.regridder.weight_matrix
+    regridder = esmf_regrid.experimental.partition.PartialRegridder(
+        src, tgt, src_block, None, weights, scheme
+    )
+    esmf_regrid.experimental.partition.save_regridder(
+        regridder, file, allow_partial=True
+    )
+    return file
 
 
 def _parser():
@@ -99,7 +154,8 @@ def regrid(source_cubes, target_mesh, num_src_chunks, partition_dir):
         for n in range(num_src_chunks[0] * num_src_chunks[1])
     ]
     scheme = esmf_regrid.ESMFAreaWeighted()
-    partition = Partition(
+    print(f"{num_src_chunks=}, num_files={len(file_names)}")
+    partition = MultiPartition(
         source_cubes[0],
         target_mesh,
         scheme,
