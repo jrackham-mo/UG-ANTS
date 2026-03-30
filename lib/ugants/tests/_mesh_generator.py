@@ -1,0 +1,190 @@
+# (C) Crown Copyright, Met Office. All rights reserved.
+#
+# This file is part of UG-ANTS and is released under the BSD 3-Clause license.
+# See LICENSE.txt in the root of the repository for full licensing details.
+# Some of the content of this file has been produced with the assistance of
+# Met Office Github Copilot Enterprise.
+"""Utility functions for creating test meshes."""
+
+import numpy as np
+
+
+def _panel_angles_to_lonlat(
+    panel_id: int,
+    alpha: np.ndarray,
+    beta: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Convert panel-local equiangular angles to geographic coordinates.
+
+    Uses an equiangular gnomonic projection to map the panel-local angular
+    coordinates ``(alpha, beta)`` to geographic longitude and latitude.
+
+    Parameters
+    ----------
+    panel_id : int
+        Panel index in the range 0-5.
+    alpha : :class:`numpy.ndarray`
+        Panel-local angle in the along-x direction, in radians.
+        Must lie in the range [-pi/4, pi/4].
+    beta : :class:`numpy.ndarray`
+        Panel-local angle in the along-y direction, in radians.
+        Must lie in the range [-pi/4, pi/4].
+
+    Returns
+    -------
+    lons : :class:`numpy.ndarray`
+        Longitudes in degrees, in the range (-180, 180].
+    lats : :class:`numpy.ndarray`
+        Latitudes in degrees, in the range [-90, 90].
+    """
+    u = np.tan(alpha)
+    v = np.tan(beta)
+    r = np.sqrt(1.0 + u**2 + v**2)
+
+    if panel_id == 0:  # +x face, centred at lon=0°, lat=0°
+        x, y, z = 1.0 / r, u / r, v / r
+    elif panel_id == 1:  # +y face, centred at lon=90°, lat=0°
+        x, y, z = -u / r, 1.0 / r, v / r
+    elif panel_id == 2:  # -x face, centred at lon=180°, lat=0°
+        x, y, z = -1.0 / r, -u / r, v / r
+    elif panel_id == 3:  # -y face, centred at lon=270°, lat=0°
+        x, y, z = u / r, -1.0 / r, v / r
+    elif panel_id == 4:  # +z face, north polar panel
+        x, y, z = -v / r, u / r, 1.0 / r
+    else:  # -z face (panel_id == 5), south polar panel
+        x, y, z = v / r, u / r, -1.0 / r
+
+    lons = np.degrees(np.arctan2(y, x))
+    lats = np.degrees(np.arcsin(np.clip(z, -1.0, 1.0)))
+
+    return lons, lats
+
+
+def cubedsphere_panel_coords(
+    panel_id: int,
+    n: int,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Generate lat/lon coordinates for a single panel of a cubed-sphere mesh.
+
+    Uses an equiangular gnomonic projection. The six panels are arranged as
+    follows:
+
+    * Panel 0: equatorial panel centred at longitude 0°
+    * Panel 1: equatorial panel centred at longitude 90°
+    * Panel 2: equatorial panel centred at longitude 180°
+    * Panel 3: equatorial panel centred at longitude 270°
+    * Panel 4: north polar panel
+    * Panel 5: south polar panel
+
+    Adjacent equatorial panels share edges, as do each equatorial panel and
+    both polar panels.
+
+    Example
+    -------
+    For a C2 panel (n=2), the four equatorial panels cover roughly:
+
+    >>> node_lons, node_lats, face_lons, face_lats = cubedsphere_panel_coords(0, 2)
+    >>> node_lons.shape
+    (3, 3)
+    >>> face_lons.shape
+    (2, 2)
+
+    Parameters
+    ----------
+    panel_id : int
+        Index of the panel to generate, in the range 0-5.
+    n : int
+        Panel resolution; each panel contains n x n faces and
+        (n+1) x (n+1) nodes.
+
+    Returns
+    -------
+    node_lons : :class:`numpy.ndarray` of shape (n+1, n+1)
+        Longitude coordinates of the panel nodes, in degrees.
+    node_lats : :class:`numpy.ndarray` of shape (n+1, n+1)
+        Latitude coordinates of the panel nodes, in degrees.
+    face_lons : :class:`numpy.ndarray` of shape (n, n)
+        Longitude coordinates of the panel face centres, in degrees.
+    face_lats : :class:`numpy.ndarray` of shape (n, n)
+        Latitude coordinates of the panel face centres, in degrees.
+
+    Raises
+    ------
+    ValueError
+        If ``panel_id`` is not in the range 0-5.
+    ValueError
+        If ``n`` is not a positive integer.
+    """
+    if panel_id not in range(6):
+        raise ValueError(f"panel_id must be in the range 0-5, got {panel_id}.")
+    if n < 1:
+        raise ValueError(f"n must be a positive integer, got {n}.")
+
+    node_angles = np.linspace(-np.pi / 4, np.pi / 4, n + 1)
+    face_angles = (node_angles[:-1] + node_angles[1:]) / 2
+
+    node_alpha, node_beta = np.meshgrid(node_angles, node_angles)
+    face_alpha, face_beta = np.meshgrid(face_angles, face_angles)
+
+    node_lons, node_lats = _panel_angles_to_lonlat(panel_id, node_alpha, node_beta)
+    face_lons, face_lats = _panel_angles_to_lonlat(panel_id, face_alpha, face_beta)
+
+    return node_lons, node_lats, face_lons, face_lats
+
+
+def cubedsphere_panel_face_node_connectivity(
+    n: int,
+    start_index: int = 0,
+) -> np.ma.MaskedArray:
+    """Derive the face-node connectivity for one cubed-sphere panel.
+
+    The returned indices represent an ``n x n`` panel of quadrilateral faces
+    connected to a ``(n+1) x (n+1)`` node grid. Node numbering matches the
+    flattening of a 2D node array with shape ``(n+1, n+1)`` in C-order.
+
+    Parameters
+    ----------
+    n : int
+        Panel resolution; each panel contains ``n x n`` faces.
+    start_index : int, default=0
+        Offset to apply to all node indices, for compatibility with one-indexed
+        or globally-indexed connectivities.
+
+    Returns
+    -------
+    :class:`numpy.ma.MaskedArray`
+        A masked array of shape ``(n*n, 4)`` containing face-node indices.
+        The node order for each face is anti-clockwise:
+        southwest, northwest, northeast, southeast.
+
+    Raises
+    ------
+    ValueError
+        If ``n`` is not a positive integer.
+    TypeError
+        If ``start_index`` is not an integer.
+    ValueError
+        If ``start_index`` is negative.
+    """
+    if n < 1:
+        raise ValueError(f"n must be a positive integer, got {n}.")
+    if not isinstance(start_index, int):
+        raise TypeError(f"start_index must be an integer, got {type(start_index)}.")
+    if start_index < 0:
+        raise ValueError(f"start_index must be non-negative, got {start_index}.")
+    node_ids = np.arange(n * n, dtype=int)
+    face_node_indices = _get_connected_nodes(node_ids, n).transpose()
+    return np.ma.masked_array(face_node_indices + start_index)
+
+
+def _get_connected_nodes(face_id: int, n: int):
+    """Get the connected nodes for a given face ID."""
+    row_number = face_id // n
+    column_number = face_id % n
+    top_left = ((n + 1) * row_number) + column_number
+    top_right = top_left + 1
+    bottom_left = top_left + n + 1
+    bottom_right = bottom_left + 1
+
+    connected_nodes = np.array([top_left, bottom_left, bottom_right, top_right])
+    return connected_nodes
