@@ -1,4 +1,4 @@
-name: CI unit tests
+name: CI Code Style
 on:
     pull_request:
         branches: main
@@ -13,8 +13,8 @@ concurrency:
     group: ${{ github.workflow }}-${{ github.ref }}
     cancel-in-progress: true
 jobs:
-    pytest:
-        name: Run unit tests
+    code-style:
+        name: Run code style checks
         runs-on: ubuntu-24.04
         steps:
             - name: Checkout
@@ -27,10 +27,28 @@ jobs:
                 environment-name: ci-env
                 cache-environment: true
 
-            - name: Install UG-ANTS
-              run: pip install .
+            - name: Run black
+              id: black
+              run: black --check .
               shell: micromamba-shell {0}
+              continue-on-error: true
 
-            - name: Run pytest
-              run: pytest --verbose
+            - name: Run ruff
+              id: ruff
+              run: ruff check .
               shell: micromamba-shell {0}
+              continue-on-error: true
+
+            - name: Collect failures
+              if: |
+                steps.black.outcome == 'failure' ||
+                steps.ruff.outcome == 'failure'
+              env:
+                BLACK_OUTCOME: ${{ steps.black.outcome }}
+                RUFF_OUTCOME: ${{ steps.ruff.outcome }}
+              run: |
+                echo "One or more code style checks failed:"
+                echo "black: $BLACK_OUTCOME"
+                echo "ruff: $RUFF_OUTCOME"
+                echo "See the logs for the failed checks for more details"
+                exit 1

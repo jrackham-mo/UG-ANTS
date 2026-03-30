@@ -2,14 +2,16 @@
 name = "UG-ANTS"
 dynamic = ["version"]
 authors = [{name = "Model Inputs And Outputs team, Met Office", email = "miao@metoffice.gov.uk"}]
-description = "Toolkit for generating ancillary files"
+description = "A Python library for generating LFRic ancillary files, developed at the Met Office."
 readme = "README.rst"
 license = {file ="LICENSE.txt"}
-requires-python = ">=3.7"
+# Updates to `requires-python` should have a corresponding update to the
+# `environment.yml` file:
+requires-python = "==3.10.13"
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: BSD License",
-    "Operating System :: Unix",
+    "Operating System :: POSIX :: Linux",
 ]
 
 [project.urls]
@@ -17,7 +19,7 @@ Homepage = "https://github.com/MetOffice/UG-ANTS"
 
 [build-system]
 # Minimum requirements for the build system to execute, defined by PEP 518.
-requires = ['setuptools']
+requires = ["setuptools>=80", "setuptools-scm[simple]>=8"]
 
 # Defined by PEP 517.
 build-backend = 'setuptools.build_meta'
@@ -25,8 +27,11 @@ build-backend = 'setuptools.build_meta'
 [tool.setuptools.packages.find]
 where = ["lib"]
 
-[tool.setuptools.dynamic]
-version = {attr = "ugants.__version__"}
+# Override default exlude pattern for black.
+# By default black will exlude files with "build" in the filepath, but ugants is installed
+# to $CYLC_WORKFLOW_RUN_DIR/share/fcm_make_ugants/build and we want these files to be checked.
+[tool.black]
+exclude = ".git"
 
 [tool.ruff]
 # Enable the pycodestyle errors and warnings (`E` and `W`), pydocstyle (`D`),
@@ -93,9 +98,11 @@ extend-ignore-names = ["data_C*", "mesh_C*", "test_*"]
 [tool.pytest.ini_options]
 filterwarnings = [
     'error',
-    # #2409 - Deprecation warning from esmpy - fixed in later versions.
+    # Ignore warning raised when UG-ANTS is not installed into an environment
+    'ignore:No package metadata was found for UG-ANTS. UG-ANTS version set to .*. Consider installing UG-ANTS into your environment. See the installation instructions in the documentation for more details.:UserWarning',
+    # Deprecation warning from esmpy - fixed in later versions. https://github.com/MetOffice/UG-ANTS/issues/46
     'ignore:Implicit None on return values is deprecated and will raise KeyErrors.:DeprecationWarning:esmpy',
-    # TODO: #2294 for understanding and handling this iris 3 warning:
+    # TODO: https://github.com/MetOffice/UG-ANTS/issues/39 for understanding and handling this iris 3 warning:
     'ignore:Ignoring a datum in netCDF load for consistency with existing behaviour:FutureWarning',
     # Ignore the provisional warning given by ugants within unittests.
     'ignore:The results output by UG-ANTS are provisional and subject to change.::ugants',
