@@ -6,6 +6,10 @@
 # Met Office Github Copilot Enterprise.
 """Utility functions for creating test meshes."""
 
+import argparse
+from collections.abc import Iterable
+
+import iris
 import numpy as np
 from iris.coords import AuxCoord
 from iris.cube import Cube
@@ -262,17 +266,87 @@ def cubedsphere_panel_mesh_cube(panel_id: int, n: int, location: str = "face") -
     return cube
 
 
-if __name__ == "__main__":
-    n = 4
-    n_panels = 6
-    faces_per_panel = n * n
-    noded_per_panel = (n + 1) * (n + 1)
-    node_face_coords = [
-        cubedsphere_panel_coords(panel_id=i, n=n) for i in range(n_panels)
-    ]
-    single_panel_face_node_connectivity = cubedsphere_panel_face_node_connectivity(n)
+def cubedsphere_from_panels(meshes: Iterable[Mesh]) -> Mesh:
+    """Construct a single cubedsphere mesh from individual panel meshes."""
+    face_lons = np.concatenate([mesh.face_coords.face_x.points for mesh in meshes])
+    face_lats = np.concatenate([mesh.face_coords.face_y.points for mesh in meshes])
 
-    node_lons = np.concatenate([node_face_coords[i][0] for i in range(n_panels)])
-    node_lats = np.concatenate([node_face_coords[i][1] for i in range(n_panels)])
-    face_lons = np.concatenate([node_face_coords[i][2] for i in range(n_panels)])
-    face_lats = np.concatenate([node_face_coords[i][3] for i in range(n_panels)])
+    new_face_x = AuxCoord(face_lons, **meshes[0].face_coords.face_x.metadata._asdict())
+    new_face_y = AuxCoord(face_lats, **meshes[0].face_coords.face_y.metadata._asdict())
+
+    node_lons = np.concatenate([mesh.node_coords.node_x.points for mesh in meshes])
+    node_lats = np.concatenate([mesh.node_coords.node_y.points for mesh in meshes])
+
+    nodes_xy = np.stack([node_lons, node_lats])
+    unique_nodes_xy, first_instances = np.unique(
+        nodes_xy,
+        return_inverse=True,
+        axis=1,
+    )
+    new_node_x = AuxCoord(
+        unique_nodes_xy[0], **meshes[0].node_coords.node_x.metadata._asdict()
+    )
+    new_node_y = AuxCoord(
+        unique_nodes_xy[1], **meshes[0].node_coords.node_y.metadata._asdict()
+    )
+    original_face_node_indices = np.concatenate(
+        [
+            _remap_connectivity_indices(mesh, panel_id)
+            for panel_id, mesh in enumerate(meshes)
+        ]
+    )
+    new_face_node_indices = first_instances[original_face_node_indices]
+    new_face_node_indices = np.ma.masked_array(new_face_node_indices)
+    new_connectivity_kwargs = meshes[0].face_node_connectivity.metadata._asdict()
+    new_face_node_connectivity = Connectivity(
+        new_face_node_indices, **new_connectivity_kwargs
+    )
+
+    new_mesh = Mesh(
+        long_name="UG-ANTS cubedsphere",
+        topology_dimension=2,
+        node_coords_and_axes=[(new_node_x, "x"), (new_node_y, "y")],
+        face_coords_and_axes=[(new_face_x, "x"), (new_face_y, "y")],
+        connectivities=[new_face_node_connectivity],
+    )
+    return new_mesh
+
+
+def _remap_connectivity_indices(mesh: Mesh, panel_id: int) -> np.ndarray:
+    original_face_node_connectivity = mesh.face_node_connectivity
+    original_face_node_indices = (
+        original_face_node_connectivity.indices_by_location()
+        - original_face_node_connectivity.start_index
+    )
+    offset = panel_id * len(mesh.node_coords.node_x.points)
+    face_node_indices = original_face_node_indices + offset
+    return face_node_indices
+
+
+def cubedsphere_mesh(n: int):
+    panels = [cubedsphere_panel_mesh(panel_id, n) for panel_id in range(6)]
+    mesh = cubedsphere_from_panels(panels)
+    return mesh
+
+
+def cubedsphere_cube(n: int):
+    mesh = cubedsphere_mesh(n)
+    mesh_coord_x, mesh_coord_y = mesh.to_MeshCoords("face")
+    data = np.arange(n * n * 6)
+    cube = Cube(
+        data=data,
+        long_name="face_data",
+        aux_coords_and_dims=[(mesh_coord_x, 0), (mesh_coord_y, 0)],
+    )
+    return cube
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("n", type=int)
+    parser.add_argument("output")
+    args = parser.parse_args()
+    n = args.n
+    output = args.output
+    cube = cubedsphere_cube(n)
+    iris.save(cube, output)
