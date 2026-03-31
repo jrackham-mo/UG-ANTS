@@ -7,6 +7,9 @@
 """Utility functions for creating test meshes."""
 
 import numpy as np
+from iris.coords import AuxCoord
+from iris.cube import Cube
+from iris.experimental.ugrid import Connectivity, Mesh
 
 
 def _panel_angles_to_lonlat(
@@ -129,6 +132,13 @@ def cubedsphere_panel_coords(
     node_lons, node_lats = _panel_angles_to_lonlat(panel_id, node_alpha, node_beta)
     face_lons, face_lats = _panel_angles_to_lonlat(panel_id, face_alpha, face_beta)
 
+    node_lons, node_lats, face_lons, face_lats = (
+        node_lons.reshape(-1),
+        node_lats.reshape(-1),
+        face_lons.reshape(-1),
+        face_lats.reshape(-1),
+    )
+
     return node_lons, node_lats, face_lons, face_lats
 
 
@@ -188,3 +198,81 @@ def _get_connected_nodes(face_id: int, n: int):
 
     connected_nodes = np.array([top_left, bottom_left, bottom_right, top_right])
     return connected_nodes
+
+
+def cubedsphere_panel_mesh(panel_id: int, n: int) -> Mesh:
+    """Construct a single panel of a cubedsphere mesh."""
+    node_lons, node_lats, face_lons, face_lats = cubedsphere_panel_coords(panel_id, n)
+    node_x = AuxCoord(
+        points=node_lons,
+        standard_name="longitude",
+        units="degrees_east",
+        long_name="node_x_coordinates",
+    )
+    node_y = AuxCoord(
+        points=node_lats,
+        standard_name="latitude",
+        units="degrees_north",
+        long_name="node_y_coordinates",
+    )
+    face_x = AuxCoord(
+        points=face_lons,
+        standard_name="longitude",
+        units="degrees_east",
+        long_name="face_x_coordinates",
+    )
+    face_y = AuxCoord(
+        points=face_lats,
+        standard_name="latitude",
+        units="degrees_north",
+        long_name="face_y_coordinates",
+    )
+
+    face_node_connectivity_indices = cubedsphere_panel_face_node_connectivity(n)
+    face_node_connectivity = Connectivity(
+        indices=face_node_connectivity_indices, cf_role="face_node_connectivity"
+    )
+    mesh = Mesh(
+        long_name=f"Panel {panel_id}",
+        topology_dimension=2,
+        node_coords_and_axes=[(node_x, "x"), (node_y, "y")],
+        face_coords_and_axes=[(face_x, "x"), (face_y, "y")],
+        connectivities=[face_node_connectivity],
+    )
+    return mesh
+
+
+def cubedsphere_panel_mesh_cube(panel_id: int, n: int, location: str = "face") -> Cube:
+    """Construct a cube defined on a single panel of a cubedsphere mesh."""
+    match location:
+        case "face":
+            n_points = n * n
+        case "node":
+            n_points = (n + 1) * (n + 1)
+        case _:
+            raise ValueError(f"Unsupported location: '{location}'")
+    mesh = cubedsphere_panel_mesh(panel_id, n)
+    mesh_coord_x, mesh_coord_y = mesh.to_MeshCoords(location)
+    data = np.arange(n_points)
+    cube = Cube(
+        data=data,
+        long_name=f"{location}_data",
+        aux_coords_and_dims=[(mesh_coord_x, 0), (mesh_coord_y, 0)],
+    )
+    return cube
+
+
+if __name__ == "__main__":
+    n = 4
+    n_panels = 6
+    faces_per_panel = n * n
+    noded_per_panel = (n + 1) * (n + 1)
+    node_face_coords = [
+        cubedsphere_panel_coords(panel_id=i, n=n) for i in range(n_panels)
+    ]
+    single_panel_face_node_connectivity = cubedsphere_panel_face_node_connectivity(n)
+
+    node_lons = np.concatenate([node_face_coords[i][0] for i in range(n_panels)])
+    node_lats = np.concatenate([node_face_coords[i][1] for i in range(n_panels)])
+    face_lons = np.concatenate([node_face_coords[i][2] for i in range(n_panels)])
+    face_lats = np.concatenate([node_face_coords[i][3] for i in range(n_panels)])
