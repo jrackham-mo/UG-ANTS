@@ -53,12 +53,17 @@ class MultiPartition(Partition):
         with dask.config.set(num_workers=num_workers):
             file_bag = dask.bag.from_sequence(zip(files, src_blocks, strict=True))
             self.saved_files = file_bag.starmap(
-                _generate_regrid_weights, src=self.src, tgt=self.tgt, scheme=self.scheme
-            ).compute(scheduler="synchronous")
+                _generate_regrid_weights,
+                src_file="<hard/coded/source/path>",
+                tgt_file="<hard/coded/target/path>",
+                scheme=self.scheme,
+            ).compute()
 
 
-def _generate_regrid_weights(file, src_block, src, tgt, scheme):
+def _generate_regrid_weights(file, src_block, src_file, tgt_file, scheme):
+    src = iris.load_cube(src_file)
     src = esmf_regrid.experimental.partition._get_chunk(src, src_block)
+    tgt = iris.mesh.load_mesh(tgt_file)
     regridder = scheme.regridder(src, tgt)
     weights = regridder.regridder.weight_matrix
     regridder = esmf_regrid.experimental.partition.PartialRegridder(
@@ -165,7 +170,8 @@ def regrid(source_cubes, target_mesh, num_src_chunks, partition_dir):
     partition.generate_files()
 
     results = iris.cube.CubeList(
-        partition.apply_regridders(source) for source in source_cubes
+        partition.apply_regridders(source, allow_incomplete=True)
+        for source in source_cubes
     )
     return results
 
