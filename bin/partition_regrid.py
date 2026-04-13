@@ -21,14 +21,95 @@ from esmf_regrid.experimental.partition import Partition
 class MultiPartition(Partition):
     """Extend the default partition class to parallelise the weights calculation."""
 
+    def __init__(
+        self,
+        src_file,
+        tgt_file,
+        scheme,
+        file_names,
+        use_dask_src_chunks=False,
+        src_chunks=None,
+        num_src_chunks=None,
+        explicit_src_blocks=None,
+        auto_generate=False,
+        saved_files=None,
+    ):
+        """Class for breaking down regridding into manageable chunks.
+
+        Parameters
+        ----------
+        src_file : str
+            Path to source file.
+        tgt_file : str
+            Path to target file.
+        scheme : regridding scheme
+            Regridding scheme to generate regridders, either ESMFAreaWeighted or ESMFBilinear.
+        file_names : iterable of str
+            A list of file names to save/load parts of the regridder to/from.
+        use_dask_src_chunks : bool, default=False
+            If true, partition using the same chunks from the source cube.
+        src_chunks : numpy array, tuple of int or tuple of tuple of int, default=None
+            Specify the size of blocks to use to divide up the cube. Dimensions are specified
+            in y,x axis order. If `src_chunks` is a tuple of int, each integer describes
+            the maximum size of a block in that dimension. If `src_chunks` is a tuple of tuples,
+            each sub-tuple describes the size of each successive block in that dimension. The sum
+            of these block sizes in each of the sub-tuples should add up to the total size of that
+            dimension or else an error is raised.
+        num_src_chunks : tuple of int
+            Specify the number of blocks to use to divide up the cube. Dimensions are specified
+            in y,x axis order. Each integer describes the number of blocks that dimension will
+            be divided into.
+        explicit_src_blocks : arraylike NxMx2
+            Explicitly specify the bounds of each block in the partition. Describes N blocks
+            along M dimensions with a pair of upper and lower bounds. The upper and lower bounds
+            describe a slice of an array, e.g. the bounds (3, 6) describe the indices 3, 4, 5 in
+            a particular dimension.
+        auto_generate : bool, default=False
+            When true, start generating files on initialisation.
+        saved_files : iterable of str
+            A list of paths to previously saved files.
+
+        Warnings
+        --------
+        This class is still experimental. While we aim to maintain backwards compatibility where
+        possible, there is no guarantee that the structure of any generated files will remain
+        consistent and compatible with future versions.
+
+        Note
+        ----
+        The source is partitioned into blocks using one of the four mutually exclusive arguments,
+        `use_dask_src_chunks`, `src_chunks`, `num_src_chunks`, or `explicit_src_blocks`. These
+        describe a partition into a number of blocks which must equal the number of `file_names`.
+
+        Currently, it is only possible to divide the source grid into chunks.
+        Meshes are not yet supported as a source.
+        """  # noqa: E501
+        self.src_file = src_file
+        self.tgt_file = tgt_file
+        src = iris.load_cube(src_file)
+        tgt = iris.mesh.load_mesh(tgt_file)
+        super().__init__(
+            src=src,
+            tgt=tgt,
+            scheme=scheme,
+            file_names=file_names,
+            use_dask_src_chunks=use_dask_src_chunks,
+            src_chunks=src_chunks,
+            num_src_chunks=num_src_chunks,
+            explicit_src_blocks=explicit_src_blocks,
+            auto_generate=auto_generate,
+            saved_files=saved_files,
+        )
+
     def generate_files(self, files_to_generate=None):
         """Generate files with regridding information.
 
         Parameters
         ----------
         files_to_generate : int, default=None
-            Specify the number of files to generate, default behaviour is to generate all files.
-        """  # noqa: E501
+            Specify the number of files to generate,
+            default behaviour is to generate all files.
+        """
         if files_to_generate is None:
             files = self.unsaved_files
         else:
@@ -43,7 +124,7 @@ class MultiPartition(Partition):
         # .. or as given by slurm allocation.
         # Only relevant when using Slurm for job scheduling
         if "SLURM_NTASKS" in os.environ:
-            cpu_count = os.environ["SLURM_NTASKS"]
+            cpu_count = int(os.environ["SLURM_NTASKS"])
 
         # Do not exceed the number of CPUs available, leaving 1 for the system.
         num_workers = cpu_count - 1
@@ -54,8 +135,8 @@ class MultiPartition(Partition):
             file_bag = dask.bag.from_sequence(zip(files, src_blocks, strict=True))
             self.saved_files = file_bag.starmap(
                 _generate_regrid_weights,
-                src_file="<hard/coded/source/path>",
-                tgt_file="<hard/coded/target/path>",
+                src_file=self.src_file,
+                tgt_file=self.tgt_file,
                 scheme=self.scheme,
             ).compute()
 
@@ -93,6 +174,12 @@ def _parser():
         "--temp-dir",
         help="Directory to write temporary partition files to.",
         required=True,
+    )
+    parser.add_argument(
+        "--files-to-generate",
+        type=int,
+        help="Number of pieces to calculate",
+        default=None,
     )
     return parser
 
@@ -133,15 +220,15 @@ def load_mesh(args):
     return target_mesh
 
 
-def regrid(source_cubes, target_mesh, num_src_chunks, partition_dir):
-    """Regrid source cubes to target mesh.
+def regrid(src_file, tgt_file, num_src_chunks, partition_dir, files_to_generate=None):
+    """Regrid source to target mesh.
 
     Parameters
     ----------
-    source_cubes : iris.cube.CubeList
-        The source cubes to regrid.
-    target_mesh : iris.mesh.Mesh
-        The target mesh to regrid to.
+    src_file : str
+        Path to source file.
+    tgt_file : str
+        Path to target file.
     num_src_chunks : list of int
         The number of blocks to use to divide up the cube.
         Dimensions are specified in y,x axis order.
@@ -159,20 +246,19 @@ def regrid(source_cubes, target_mesh, num_src_chunks, partition_dir):
         for n in range(num_src_chunks[0] * num_src_chunks[1])
     ]
     scheme = esmf_regrid.ESMFAreaWeighted()
-    print(f"{num_src_chunks=}, num_files={len(file_names)}")
+    print(f"{num_src_chunks=}, num_files={len(file_names)}, {files_to_generate=}")
     partition = MultiPartition(
-        source_cubes[0],
-        target_mesh,
+        src_file,
+        tgt_file,
         scheme,
         num_src_chunks=num_src_chunks,
         file_names=file_names,
     )
-    partition.generate_files()
+    partition.generate_files(files_to_generate)
+    # breakpoint()
+    # partition.saved_files = set(os.listdir(partition_dir)).intersection(file_names)
 
-    results = iris.cube.CubeList(
-        partition.apply_regridders(source, allow_incomplete=True)
-        for source in source_cubes
-    )
+    results = partition.apply_regridders(partition.src, allow_incomplete=True)
     return results
 
 
@@ -180,11 +266,12 @@ if __name__ == "__main__":
     parser = _parser()
     args = parser.parse_args()
 
-    source_cubes = load_source(args)
-    target_mesh = load_mesh(args)
-
     regridded_cubes = regrid(
-        source_cubes, target_mesh, args.num_src_chunks, args.temp_dir
+        args.source,
+        args.target_mesh,
+        args.num_src_chunks,
+        args.temp_dir,
+        args.files_to_generate,
     )
 
     iris.save(regridded_cubes, args.output)
