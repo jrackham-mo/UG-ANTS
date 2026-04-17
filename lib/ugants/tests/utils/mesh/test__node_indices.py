@@ -4,7 +4,7 @@
 # See LICENSE.txt in the root of the repository for full licensing details.
 import numpy as np
 import pytest
-from ugants.utils.mesh import (
+from ugants.utils._mesh import (
     _node_indices,
     gen_node_indices_panel_1,
     gen_node_indices_panel_2,
