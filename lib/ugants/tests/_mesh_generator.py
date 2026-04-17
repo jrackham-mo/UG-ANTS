@@ -323,7 +323,7 @@ def _remap_connectivity_indices(mesh: Mesh, panel_id: int) -> np.ndarray:
     return face_node_indices
 
 
-def cubedsphere_mesh(n: int):
+def cubedsphere_mesh(n: int) -> Mesh:
     panels = [cubedsphere_panel_mesh(panel_id, n) for panel_id in range(6)]
     mesh = cubedsphere_from_panels(panels)
     return mesh
