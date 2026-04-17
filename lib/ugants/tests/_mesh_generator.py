@@ -343,8 +343,12 @@ def cubedsphere_cube(n: int):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("n", type=int)
-    parser.add_argument("output")
+    parser.add_argument(
+        "n", type=int, help="Number of cells along a panel edge (the 'C-number')"
+    )
+    parser.add_argument(
+        "output", help="Where to write the generated cubed sphere (must be a .nc file)"
+    )
     args = parser.parse_args()
     n = args.n
     output = args.output
