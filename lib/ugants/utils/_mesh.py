@@ -31,8 +31,49 @@ class Panel:
 
         self.face_indices = _face_indices(n, panel_id)
 
+        self._node_indices_set = False
+        self._node_indices = np.empty(((n + 1), (n + 1)), dtype=np.int64)
+
+    @property
+    def node_indices(self):
+        if not self._node_indices_set:
+            raise ValueError(
+                "node_indices have not been initialised, use set_node_indices method."
+            )
+        return self._node_indices
+
+    @node_indices.setter
+    def node_indices(self, value):
+        self._node_indices = value
+        self._node_indices_set = True
+
+    def set_node_indices(self, *other_panels):
+        match self.panel_id:
+            case 0:
+                self.node_indices = gen_node_indices_panel_0(self.n)
+            case 1:
+                panel_0 = get_panel_by_id(other_panels, 0)
+                self.node_indices = gen_node_indices_panel_1(panel_0.node_indices)
+            case 2:
+                panel_1 = get_panel_by_id(other_panels, 1)
+                self.node_indices = gen_node_indices_panel_2(panel_1.node_indices)
+            case 3:
+                panel_0 = get_panel_by_id(other_panels, 0)
+                panel_2 = get_panel_by_id(other_panels, 2)
+                self.node_indices = gen_node_indices_panel_3(
+                    panel_0.node_indices, panel_2.node_indices
+                )
+            case _:
+                raise ValueError(f"Invalid panel_id: {self.panel_id}")
+
     def __repr__(self):
         return f"Panel(n={self.n}, panel_id={self.panel_id})"
+
+
+def get_panel_by_id(panels: list[Panel], panel_id: int) -> Panel:
+    index = [panel.panel_id for panel in panels].index(panel_id)
+    panel = panels[index]
+    return panel
 
 
 def _face_indices(n: int, panel_id: int):
