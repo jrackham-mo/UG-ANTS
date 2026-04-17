@@ -42,34 +42,6 @@ def _face_indices(n: int, panel_id: int):
     return face_indices
 
 
-def _node_indices(n: int, panel_id: int):
-    match panel_id:
-        case 0:
-            node_indices = _face_indices(n + 1, panel_id)
-        case 1:
-            node_indices = _node_indices_panel_1(n)
-        case _:
-            raise ValueError(f"Unsupported panel_id: {panel_id}")
-    return node_indices
-
-
-def _node_indices_panel_1(n: int):
-    first_column_start = n
-    first_column_end = (n + 1) * (n + 1)
-    first_column_shape = ((n + 1), 1)
-    first_column = np.arange(
-        first_column_start, first_column_end, step=(n + 1)
-    ).reshape(first_column_shape)
-
-    rest_start = first_column_end
-    rest_stop = rest_start + (n * (n + 1))
-    rest_shape = (n + 1, n)
-    rest = np.arange(rest_start, rest_stop).reshape(rest_shape)
-
-    node_indices = np.hstack([first_column, rest])
-    return node_indices
-
-
 def get_square_array_size(x: np.ndarray):
     shape = x.shape
     if (len(shape) != 2) or (shape[0] != shape[1]):
@@ -79,6 +51,11 @@ def get_square_array_size(x: np.ndarray):
         )
     n = shape[0]
     return n
+
+
+def gen_node_indices_panel_0(n: int):
+    node_indices_panel_0 = _face_indices(n=(n + 1), panel_id=0)
+    return node_indices_panel_0
 
 
 def gen_node_indices_panel_1(node_indices_panel_0: np.ndarray):

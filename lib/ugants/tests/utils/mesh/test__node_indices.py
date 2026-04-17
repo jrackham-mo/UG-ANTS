@@ -5,7 +5,7 @@
 import numpy as np
 import pytest
 from ugants.utils._mesh import (
-    _node_indices,
+    gen_node_indices_panel_0,
     gen_node_indices_panel_1,
     gen_node_indices_panel_2,
     gen_node_indices_panel_3,
@@ -13,7 +13,7 @@ from ugants.utils._mesh import (
 
 
 @pytest.fixture()
-def expected_panel_0():
+def node_indices_panel_0():
     node_indices = np.array(
         [
             [0, 1, 2, 3, 4],
@@ -27,7 +27,7 @@ def expected_panel_0():
 
 
 @pytest.fixture()
-def expected_panel_1():
+def node_indices_panel_1():
     node_indices = np.array(
         [
             [4, 25, 26, 27, 28],
@@ -41,7 +41,7 @@ def expected_panel_1():
 
 
 @pytest.fixture()
-def expected_panel_2():
+def node_indices_panel_2():
     node_indices = np.array(
         [
             [28, 45, 46, 47, 48],
@@ -55,7 +55,7 @@ def expected_panel_2():
 
 
 @pytest.fixture()
-def expected_panel_3():
+def node_indices_panel_3():
     node_indices = np.array(
         [
             [48, 65, 66, 67, 0],
@@ -68,29 +68,40 @@ def expected_panel_3():
     return node_indices
 
 
+@pytest.fixture()
+def node_indices_panel_4():
+    node_indices = np.array([[]])
+    return node_indices
+
+
 class TestC4:
-    def test_panel_0(self, expected_panel_0):
-        actual = _node_indices(n=4, panel_id=0)
-        np.testing.assert_array_equal(actual, expected_panel_0)
+    def test_panel_0(self, node_indices_panel_0):
+        actual = gen_node_indices_panel_0(n=4)
+        np.testing.assert_array_equal(actual, node_indices_panel_0)
 
-    def test_panel_1(self, expected_panel_0, expected_panel_1):
-        actual = gen_node_indices_panel_1(expected_panel_0)
-        np.testing.assert_array_equal(actual, expected_panel_1)
+    def test_panel_1(self, node_indices_panel_0, node_indices_panel_1):
+        actual = gen_node_indices_panel_1(node_indices_panel_0)
+        np.testing.assert_array_equal(actual, node_indices_panel_1)
 
-    def test_panel_2(self, expected_panel_1, expected_panel_2):
-        actual = gen_node_indices_panel_2(expected_panel_1)
-        np.testing.assert_array_equal(actual, expected_panel_2)
+    def test_panel_2(self, node_indices_panel_1, node_indices_panel_2):
+        actual = gen_node_indices_panel_2(node_indices_panel_1)
+        np.testing.assert_array_equal(actual, node_indices_panel_2)
 
-    def test_panel_3(self, expected_panel_0, expected_panel_2, expected_panel_3):
-        actual = gen_node_indices_panel_3(expected_panel_0, expected_panel_2)
-        np.testing.assert_array_equal(actual, expected_panel_3)
+    def test_panel_3(
+        self, node_indices_panel_0, node_indices_panel_2, node_indices_panel_3
+    ):
+        actual = gen_node_indices_panel_3(node_indices_panel_0, node_indices_panel_2)
+        np.testing.assert_array_equal(actual, node_indices_panel_3)
 
-    # def test_panel_0(self):
-    #     expected = np.array(
-    #         [[0, 1, 2, 3], [4, 5, 6, 7], [8, 9, 10, 11], [12, 13, 14, 15]]
-    #     )
-    #     actual = _node_indices(n=self.N, panel_id=0)
-    #     np.testing.assert_array_equal(actual, expected)
+    def test_panel_4(
+        self,
+        node_indices_panel_0,
+        node_indices_panel_1,
+        node_indices_panel_2,
+        node_indices_panel_3,
+        node_indices_panel_4,
+    ):
+        pass
 
     # def test_panel_0(self):
     #     expected = np.array(
