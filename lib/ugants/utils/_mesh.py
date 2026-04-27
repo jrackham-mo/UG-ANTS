@@ -95,11 +95,67 @@ def get_square_array_size(x: np.ndarray):
 
 
 def gen_node_indices_panel_0(n: int):
+    """Generate a 2D array of node indices for panel 0.
+
+    Parameters
+    ----------
+    n : int
+        Number of *faces* along the panel edge
+
+    Returns
+    -------
+    numpy.ndarray
+        An array of shape (n + 1, n + 1) containing the integer node indices
+        for panel 0
+
+    Example
+    -------
+    >>> gen_node_indices_panel_0(4)
+    np.array(
+        [
+            [0, 1, 2, 3, 4],
+            [5, 6, 7, 8, 9],
+            [10, 11, 12, 13, 14],
+            [15, 16, 17, 18, 19],
+            [20, 21, 22, 23, 24],
+        ]
+    )
+    """
     node_indices_panel_0 = _face_indices(n=(n + 1), panel_id=0)
     return node_indices_panel_0
 
 
 def gen_node_indices_panel_1(node_indices_panel_0: np.ndarray):
+    """Generate a 2D array of node indices for panel 1.
+
+    The first column of nodes of panel 1 have the same indices as the last column
+    of nodes on panel 0.
+
+    Parameters
+    ----------
+    node_indices_panel_0: np.ndarray
+        Pre-generated 2D array of node indices for panel 0
+
+    Returns
+    -------
+    numpy.ndarray
+        An array of same shape as node_indices_panel_0 containing the integer
+        node indices for panel 1
+
+    Example
+    -------
+    >>> node_indices_panel_0 = gen_node_indices_panel_0(4)
+    >>> gen_node_indices_panel_1(node_indices_panel_0)
+    np.array(
+        [
+            [4, 25, 26, 27, 28],
+            [9, 29, 30, 31, 32],
+            [14, 33, 34, 35, 36],
+            [19, 37, 38, 39, 40],
+            [24, 41, 42, 43, 44],
+        ]
+    )
+    """
     n = get_square_array_size(node_indices_panel_0)
     last_column_of_panel_0 = node_indices_panel_0[:, -1]
     first_column_panel_1 = last_column_of_panel_0.reshape(n, 1)
@@ -112,6 +168,37 @@ def gen_node_indices_panel_1(node_indices_panel_0: np.ndarray):
 
 
 def gen_node_indices_panel_2(node_indices_panel_1: np.ndarray):
+    """Generate a 2D array of node indices for panel 2.
+
+    The first column of nodes of panel 2 have the same indices as the last column
+    of nodes on panel 1.
+
+    Parameters
+    ----------
+    node_indices_panel_1: np.ndarray
+        Pre-generated 2D array of node indices for panel 1
+
+    Returns
+    -------
+    numpy.ndarray
+        An array of same shape as node_indices_panel_1 containing the integer
+        node indices for panel 2
+
+    Example
+    -------
+    >>> node_indices_panel_0 = gen_node_indices_panel_0(4)
+    >>> node_indices_panel_1 = gen_node_indices_panel_1(node_indices_panel_0)
+    >>> gen_node_indices_panel_2(node_indices_panel_1)
+    np.array(
+        [
+            [28, 45, 46, 47, 48],
+            [32, 49, 50, 51, 52],
+            [36, 53, 54, 55, 56],
+            [40, 57, 58, 59, 60],
+            [44, 61, 62, 63, 64],
+        ]
+    )
+    """
     node_indices_panel_2 = gen_node_indices_panel_1(node_indices_panel_1)
     return node_indices_panel_2
 
@@ -119,6 +206,43 @@ def gen_node_indices_panel_2(node_indices_panel_1: np.ndarray):
 def gen_node_indices_panel_3(
     node_indices_panel_0: np.ndarray, node_indices_panel_2: np.ndarray
 ):
+    """Generate a 2D array of node indices for panel 3.
+
+    The first column of nodes of panel 3 have the same indices as the last column
+    of nodes on panel 2.
+    The last column of nodes of panel 3 have the same indices as the first column
+    of nodes on panel 0.
+
+    Parameters
+    ----------
+    node_indices_panel_0: np.ndarray
+        Pre-generated 2D array of node indices for panel 0
+    node_indices_panel_2: np.ndarray
+        Pre-generated 2D array of node indices for panel 2
+
+
+    Returns
+    -------
+    numpy.ndarray
+        An array of same shape as node_indices_panel_0 containing the integer
+        node indices for panel 3
+
+    Example
+    -------
+    >>> node_indices_panel_0 = gen_node_indices_panel_0(4)
+    >>> node_indices_panel_1 = gen_node_indices_panel_1(node_indices_panel_0)
+    >>> node_indices_panel_2 = gen_node_indices_panel_2(node_indices_panel_1)
+    >>> gen_node_indices_panel_3(node_indices_panel_0, node_indices_panel_2)
+    np.array(
+        [
+            [48, 65, 66, 67, 0],
+            [52, 68, 69, 70, 5],
+            [56, 71, 72, 73, 10],
+            [60, 74, 75, 76, 15],
+            [64, 77, 78, 79, 20],
+        ]
+    )
+    """
     n = get_square_array_size(node_indices_panel_0)
     m = get_square_array_size(node_indices_panel_2)
     if n != m:
