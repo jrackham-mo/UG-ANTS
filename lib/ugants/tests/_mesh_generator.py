@@ -191,6 +191,95 @@ def cubedsphere_panel_face_node_connectivity(
     return np.ma.masked_array(face_node_indices + start_index)
 
 
+def _valid_face_nodes(face_nodes: np.ndarray) -> np.ndarray:
+    """Return valid node IDs for one face.
+
+    Masked entries and negative values are removed.
+    """
+    row = np.ma.asarray(face_nodes)
+    if np.ma.isMaskedArray(row):
+        valid_nodes = row.compressed()
+    else:
+        valid_nodes = np.asarray(row)
+
+    valid_nodes = np.asarray(valid_nodes, dtype=int)
+    return valid_nodes[valid_nodes >= 0]
+
+
+def _face_edges_from_nodes(valid_nodes: np.ndarray) -> list[tuple[int, int]]:
+    """Construct undirected edges for one face from ordered nodes."""
+    if valid_nodes.size < 2:
+        return []
+
+    edges = []
+    for index, node0 in enumerate(valid_nodes):
+        node1 = int(valid_nodes[(index + 1) % valid_nodes.size])
+        node0 = int(node0)
+        if node0 == node1:
+            continue
+        edges.append((node0, node1) if node0 < node1 else (node1, node0))
+    return edges
+
+
+def _build_neighbour_sets(
+    edge_to_faces: dict[tuple[int, int], list[int]],
+    n_faces: int,
+) -> list[set[int]]:
+    """Convert edge ownership into per-face neighbour sets."""
+    neighbours: list[set[int]] = [set() for _ in range(n_faces)]
+    for connected_faces in edge_to_faces.values():
+        unique_faces = tuple(dict.fromkeys(connected_faces))
+        for index, first_face in enumerate(unique_faces):
+            for second_face in unique_faces[index + 1 :]:
+                neighbours[first_face].add(second_face)
+                neighbours[second_face].add(first_face)
+    return neighbours
+
+
+def face_node_to_face_face_connectivity(
+    face_node_connectivity: np.ndarray,
+) -> np.ndarray:
+    """Derive face-face connectivity from face-node connectivity.
+
+    Faces are considered connected when they share an edge, i.e. two nodes.
+
+    Parameters
+    ----------
+    face_node_connectivity : :class:`numpy.ndarray`
+        Array of shape ``(n, m)`` describing ``n`` faces and up to ``m`` nodes
+        per face. Masked entries and negative indices are ignored.
+
+    Returns
+    -------
+    :class:`numpy.ndarray`
+        Integer array of shape ``(n, k)`` where each row contains neighbouring
+        face indices for one face. ``k`` is the maximum neighbour count found
+        across all faces. Unused entries are filled with ``-1``.
+    """
+    if face_node_connectivity.ndim != 2:
+        raise ValueError("face_node_connectivity must be a 2D array of shape (n, m).")
+
+    n_faces = face_node_connectivity.shape[0]
+    edge_to_faces: dict[tuple[int, int], list[int]] = {}
+
+    for face_id in range(n_faces):
+        valid_nodes = _valid_face_nodes(face_node_connectivity[face_id])
+        for edge in _face_edges_from_nodes(valid_nodes):
+            edge_to_faces.setdefault(edge, []).append(face_id)
+
+    neighbours = _build_neighbour_sets(edge_to_faces, n_faces)
+
+    k = max((len(face_neighbours) for face_neighbours in neighbours), default=0)
+    face_face_connectivity = np.full((n_faces, k), -1, dtype=int)
+    for face_id, face_neighbours in enumerate(neighbours):
+        if not face_neighbours:
+            continue
+        ordered_neighbours = np.array(sorted(face_neighbours), dtype=int)
+        face_face_connectivity[face_id, : len(ordered_neighbours)] = ordered_neighbours
+
+    return face_face_connectivity
+
+
 def _get_connected_nodes(face_id: int, n: int):
     """Get the connected nodes for a given face ID."""
     row_number = face_id // n
