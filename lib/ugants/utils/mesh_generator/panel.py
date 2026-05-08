@@ -5,8 +5,9 @@
 from dataclasses import dataclass
 
 import iris.coords
+import iris.cube
 import numpy as np
-from iris.experimental.ugrid import Mesh
+from iris.experimental.ugrid import Mesh, Connectivity
 
 
 class Panel:
@@ -17,9 +18,32 @@ class Panel:
             )
         self.c = c
         self.panel_id = panel_id
-        node_points, face_points = self._generate_plane_cartesian_coordinates()
-        self.node_lats, self.node_lons = node_points.to_lat_lon()
-        self.face_lats, self.face_lons = face_points.to_lat_lon()
+        panel_0_node_points, panel_0_face_points = (
+            self._generate_panel_0_plane_cartesian_coordinates()
+        )
+        if panel_id < 4:
+            # Equatorial panels
+            # Rotate panel 0 by by a multiple of 90 degrees in longitude
+            self.node_lats, self.node_lons = panel_0_node_points.to_lat_lon()
+            self.face_lats, self.face_lons = panel_0_face_points.to_lat_lon()
+            self.node_lons += panel_id * 90.0
+            self.face_lons += panel_id * 90.0
+
+        elif panel_id == 4:
+            # North polar panel
+            # Rotate panel 0 by 90 degrees "upwards"
+            panel_4_node_points = rotate_panel_0_to_4(panel_0_node_points)
+            panel_4_face_points = rotate_panel_0_to_4(panel_0_face_points)
+            self.node_lats, self.node_lons = panel_4_node_points.to_lat_lon()
+            self.face_lats, self.face_lons = panel_4_face_points.to_lat_lon()
+
+        elif panel_id == 5:
+            # South polar panel
+            # Rotate panel 0 by 90 degrees "downwards"
+            panel_5_node_points = rotate_panel_0_to_5(panel_0_node_points)
+            panel_5_face_points = rotate_panel_0_to_5(panel_0_face_points)
+            self.node_lats, self.node_lons = panel_5_node_points.to_lat_lon()
+            self.face_lats, self.face_lons = panel_5_face_points.to_lat_lon()
 
     def to_iris_mesh(self):
         node_x_auxcoord = iris.coords.AuxCoord(
@@ -30,8 +54,8 @@ class Panel:
         )
         node_y_auxcoord = iris.coords.AuxCoord(
             points=self.node_lats.flatten(),
-            standard_name="longitude",
-            units="degrees_east",
+            standard_name="latitude",
+            units="degrees_north",
             long_name="node_y_coordinates",
         )
         face_x_auxcoord = iris.coords.AuxCoord(
@@ -42,20 +66,37 @@ class Panel:
         )
         face_y_auxcoord = iris.coords.AuxCoord(
             points=self.face_lats.flatten(),
-            standard_name="longitude",
-            units="degrees_east",
+            standard_name="latitude",
+            units="degrees_north",
             long_name="face_y_coordinates",
         )
-
+        face_node_connectivity = Connectivity(
+            generate_face_node_connectivity_array(self.c),
+            cf_role="face_node_connectivity",
+        )
         mesh = Mesh(
             long_name=f"UG-ANTS mesh: panel {self.panel_id}",
             topology_dimension=2,
             node_coords_and_axes=[(node_x_auxcoord, "x"), (node_y_auxcoord, "y")],
-            # connectivities=[edge_node_c, face_node_c],
+            connectivities=[face_node_connectivity],
             face_coords_and_axes=[(face_x_auxcoord, "x"), (face_y_auxcoord, "y")],
         )
+        return mesh
 
-    def _generate_plane_cartesian_coordinates(self):
+    def to_iris_cube(self, data=None):
+        if data is None:
+            data = np.arange(self.c**2)
+        mesh = self.to_iris_mesh()
+        location = "face"
+        mesh_coord_x, mesh_coord_y = mesh.to_MeshCoords(location)
+        cube = iris.cube.Cube(
+            data=data,
+            long_name=f"{location}_data",
+            aux_coords_and_dims=[(mesh_coord_x, 0), (mesh_coord_y, 0)],
+        )
+        return cube
+
+    def _generate_panel_0_plane_cartesian_coordinates(self):
         """Generate points on the x=1 plane representing the nodes and faces.
 
         Parameters
@@ -110,13 +151,24 @@ class CartesianPoints:
         return CartesianPoints(x, y, z)
 
     def to_lat_lon(self):
-        xy_radius = np.sqrt(np.square(self.x) + np.square(self.y))
+        xy_radius = np.hypot(self.x, self.y)
         lat_rad = np.arctan2(self.z, xy_radius)
         lon_rad = np.arctan2(self.y, self.x)
 
         lat_deg = np.rad2deg(lat_rad)
         lon_deg = np.rad2deg(lon_rad)
         return lat_deg, lon_deg
+
+
+def generate_face_node_connectivity_array(c: int):
+    node_indices = np.arange((c + 1) ** 2).reshape(c + 1, c + 1)
+    top_left = node_indices[:-1, :-1].flatten()
+    bottom_left = node_indices[1:, :-1].flatten()
+    top_right = node_indices[:-1, 1:].flatten()
+    bottom_right = node_indices[1:, 1:].flatten()
+    connectivity_array = np.vstack([top_left, bottom_left, bottom_right, top_right]).T
+    connectivity_array = np.ma.masked_array(connectivity_array)
+    return connectivity_array
 
 
 def rotate_panel_0_to_1(cartesian_points: CartesianPoints) -> CartesianPoints:
