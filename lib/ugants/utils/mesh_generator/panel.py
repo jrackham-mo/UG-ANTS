@@ -7,7 +7,7 @@ from dataclasses import dataclass
 import iris.coords
 import iris.cube
 import numpy as np
-from iris.experimental.ugrid import Mesh, Connectivity
+from iris.experimental.ugrid import Connectivity, Mesh
 
 
 class Panel:
@@ -74,11 +74,15 @@ class Panel:
             generate_face_node_connectivity_array(self.c),
             cf_role="face_node_connectivity",
         )
+        face_face_connectivity = Connectivity(
+            generate_face_face_connectivity_array(self.c),
+            cf_role="face_face_connectivity",
+        )
         mesh = Mesh(
             long_name=f"UG-ANTS mesh: panel {self.panel_id}",
             topology_dimension=2,
             node_coords_and_axes=[(node_x_auxcoord, "x"), (node_y_auxcoord, "y")],
-            connectivities=[face_node_connectivity],
+            connectivities=[face_node_connectivity, face_face_connectivity],
             face_coords_and_axes=[(face_x_auxcoord, "x"), (face_y_auxcoord, "y")],
         )
         return mesh
@@ -151,6 +155,18 @@ class CartesianPoints:
         return CartesianPoints(x, y, z)
 
     def to_lat_lon(self):
+        """Convert cartesian vectors to latitude-longitude coordinates in degrees.
+
+        Longitude is defined as the angle between the x-axis and the projection
+        of the vector in the x-y plane.
+
+        Latitude is defined as the angle between the vector and the x-y plane.
+
+        Returns
+        -------
+        tuple[np.ndarray, np.ndarray]
+            Arrays of latitude and longitude coordinates, respectively
+        """
         xy_radius = np.hypot(self.x, self.y)
         lat_rad = np.arctan2(self.z, xy_radius)
         lon_rad = np.arctan2(self.y, self.x)
@@ -161,6 +177,47 @@ class CartesianPoints:
 
 
 def generate_face_node_connectivity_array(c: int):
+    """Generate a face-node connectivity array for a single panel.
+
+    Each face is connected to 4 nodes. The connectivity array maps each face to
+    its nodes in anticlockwise order, starting from the top left node.
+
+    Example
+    -------
+    For c=2, there are 2 faces and 3 nodes along each edge of the panel.
+    The arrangement looks like this:
+
+    [0]---[1]---[2]
+     | (0) | (1) |
+    [3]---[4]---[5]
+     | (2) | (3) |
+    [6]---[7]---[8]
+
+    Key:
+    [i] = node i
+    (j) = face j
+
+    >>> generate_face_node_connectivity_array(c=2)
+    masked_array(
+        data=[
+            [0, 3, 4, 1],
+            [1, 4, 5, 2],
+            [3, 6, 7, 4],
+            [4, 7, 8, 5]
+            ],
+        mask=False,
+        fill_value=999999)
+
+    Parameters
+    ----------
+    c: int
+        The number of faces along a panel edge
+
+    Returns
+    -------
+    np.ma.array
+        An array of shape (c**2, 4) mapping each face to its 4 nodes
+    """
     node_indices = np.arange((c + 1) ** 2).reshape(c + 1, c + 1)
     top_left = node_indices[:-1, :-1].flatten()
     bottom_left = node_indices[1:, :-1].flatten()
@@ -170,6 +227,71 @@ def generate_face_node_connectivity_array(c: int):
     connectivity_array = np.ma.masked_array(connectivity_array)
     return connectivity_array
 
+def generate_face_face_connectivity_array(c: int):
+    """Generate a face-face connectivity array for a single panel.
+
+    Each face is connected to a maximum of 4 faces:
+
+    - faces internal to the panel have 4 neighbours
+    - faces on the edge of a panel have 3 neighbours
+    - faces on the corner of a panel have two neighbours
+
+    Where a face has less than 4 neighbours (i.e. it is on an edge/corner of the
+    panel), the connectivity array will contain masked elements.
+
+    Connected faces are returned in anticlockwise order, starting from the top.
+
+    Example
+    -------
+    For c=2, there are 2 faces and 3 nodes along each edge of the panel.
+    The arrangement looks like this:
+
+    [0]---[1]---[2]
+     | (0) | (1) |
+    [3]---[4]---[5]
+     | (2) | (3) |
+    [6]---[7]---[8]
+
+    Key:
+    [i] = node i
+    (j) = face j
+
+    >>> generate_face_face_connectivity_array(c=2)
+    masked_array(
+        data=[
+            [--, --, 2, 1],
+            [--, 0, 3, --],
+            [0, --, --, 3],
+            [1, 2, --, --]
+            ],
+        mask=[
+            [True, True, False, False],
+            [True, False, False, True],
+            [False, True, True, False],
+            [False, False, True, True]
+            ],
+        fill_value=999999)
+
+    Parameters
+    ----------
+    c: int
+        The number of faces along a panel edge
+
+    Returns
+    -------
+    np.ma.array
+        An array of shape (c**2, 4) mapping each face to its neighbouring faces
+    """
+    face_indices = np.arange(c**2).reshape(c, c)
+    padded_face_indices = np.pad(face_indices, pad_width=1, constant_values=-1)
+    top = padded_face_indices[:-2, 1:-1].flatten()
+    bottom = padded_face_indices[2:, 1:-1].flatten()
+    left = padded_face_indices[1:-1, :-2].flatten()
+    right = padded_face_indices[1:-1, 2:].flatten()
+    connectivity_array = np.vstack([top, left, bottom, right]).T
+    mask = connectivity_array == -1
+    connectivity_array = np.ma.masked_array(connectivity_array, mask=mask)
+    return connectivity_array
 
 def rotate_panel_0_to_1(cartesian_points: CartesianPoints) -> CartesianPoints:
     x = -cartesian_points.y
