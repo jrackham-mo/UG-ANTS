@@ -10,6 +10,12 @@ import numpy as np
 from iris.experimental.ugrid import Connectivity, Mesh
 
 
+def panel_mesh(c: int, panel_id: int):
+    panel = Panel(c, panel_id)
+    mesh = panel.to_iris_mesh()
+    return mesh
+
+
 class Panel:
     def __init__(self, c: int, panel_id: int):
         if panel_id not in range(6):
@@ -23,7 +29,7 @@ class Panel:
         )
         if panel_id < 4:
             # Equatorial panels
-            # Rotate panel 0 by by a multiple of 90 degrees in longitude
+            # Rotate panel 0 by a multiple of 90 degrees in longitude
             self.node_lats, self.node_lons = panel_0_node_points.to_lat_lon()
             self.face_lats, self.face_lons = panel_0_face_points.to_lat_lon()
             self.node_lons += panel_id * 90.0
@@ -103,6 +109,9 @@ class Panel:
     def _generate_panel_0_plane_cartesian_coordinates(self):
         """Generate points on the x=1 plane representing the nodes and faces.
 
+        Points are spaced equally in angle, so that they are more evenly distributed
+        on the surface of the sphere.
+
         Parameters
         ----------
         c : int
@@ -112,6 +121,8 @@ class Panel:
         -------
         tuple[CartesianPoints, CartesianPoints]
         """
+        # Alphas are angles about the z-axis
+        # Betas are angles about the y-axis
         node_alphas = np.linspace(-np.pi / 4, np.pi / 4, self.c + 1)
         node_betas = np.linspace(np.pi / 4, -np.pi / 4, self.c + 1)
         face_alphas = 0.5 * (node_alphas[:-1] + node_alphas[1:])
@@ -227,6 +238,7 @@ def generate_face_node_connectivity_array(c: int):
     connectivity_array = np.ma.masked_array(connectivity_array)
     return connectivity_array
 
+
 def generate_face_face_connectivity_array(c: int):
     """Generate a face-face connectivity array for a single panel.
 
@@ -292,6 +304,7 @@ def generate_face_face_connectivity_array(c: int):
     mask = connectivity_array == -1
     connectivity_array = np.ma.masked_array(connectivity_array, mask=mask)
     return connectivity_array
+
 
 def rotate_panel_0_to_1(cartesian_points: CartesianPoints) -> CartesianPoints:
     x = -cartesian_points.y
