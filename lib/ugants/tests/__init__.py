@@ -15,6 +15,7 @@ them out.
 from pathlib import Path
 
 import iris
+import numpy as np
 
 _TESTS_PATH = Path(__file__).parent
 _RESOURCE_PATH = _TESTS_PATH / "resources"
@@ -90,3 +91,25 @@ def add_axis(original_cube, name, axis=""):
                 )
         cube.add_dim_coord(coordinate, 0)
     return cubes.concatenate_cube()
+
+
+def assert_masked_array_equal(actual: np.ma.MaskedArray, expected: np.ma.MaskedArray):
+    """Compare two masked arrays, including both the data and the mask.
+
+    Parameters
+    ----------
+    actual : np.ma.MaskedArray
+        The first array to compare.
+    expected : np.ma.MaskedArray
+        The second array to compare.
+    """
+    # Check masks are equal
+    np.testing.assert_array_equal(
+        actual.mask, expected.mask, err_msg="Inconsistent masks"
+    )
+    # Check unmasked data are equal
+    np.testing.assert_array_equal(
+        actual.data[~actual.mask],
+        expected.data[~expected.mask],
+        err_msg="Inconsistent unmasked data",
+    )
