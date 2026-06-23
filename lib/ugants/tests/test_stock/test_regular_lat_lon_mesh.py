@@ -4,7 +4,6 @@
 # See LICENSE.txt in the root of the repository for full licensing details.
 import numpy as np
 import pytest
-
 from ugants.tests.stock import regular_lat_lon_mesh
 
 
