@@ -408,7 +408,7 @@ def mesh2cube(mesh: Mesh, data=None) -> Cube:
     ----------
     mesh: iris.experimental.ugrid.Mesh
         The mesh onto which the data will be located
-    data: np.ndarray, optional
+    data: :class:`numpy.ndarray`, optional
         Optional data payload to attach to the cube. If not provided, synthetic
         data will be generated using np.arange. Note: the data array must be of
         shape (n_faces,), where n_faces is the number of faces on the mesh

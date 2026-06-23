@@ -2,21 +2,64 @@
 #
 # This file is part of UG-ANTS and is released under the BSD 3-Clause license.
 # See LICENSE.txt in the root of the repository for full licensing details.
+# Some of the content of this file has been produced with the assistance of
+# Met Office Github Copilot Enterprise.
+"""Build cubed-sphere panel geometry and connectivity for Iris UGRID meshes.
+
+This module provides panel-level mesh generation utilities, including:
+
+- :class:`PanelBuilder`: construct node/face locations and connectivity for one panel;
+- helper functions for panel-local coordinates, rotations, and connectivity arrays.
+"""
+
 from dataclasses import dataclass
 
 import iris.coords
-import iris.cube
 import numpy as np
 from iris.experimental.ugrid import Connectivity, Mesh
 
 
-def panel_mesh(c: int, panel_id: int):
-    panel = PanelBuilder(c, panel_id)
-    mesh = panel.to_iris_mesh()
-    return mesh
-
-
 class PanelBuilder:
+    """Build mesh geometry and connectivity for a single cubed-sphere panel.
+
+    The following panel IDs are supported:
+
+    +----------+-----------------------------+-------------------------------+
+    | panel_id | Cube-face orientation       | Approximate central location  |
+    +==========+=============================+===============================+
+    | 0        | +x (reference panel)        | lon 0°, lat 0°                |
+    +----------+-----------------------------+-------------------------------+
+    | 1        | +y                          | lon 90°E, lat 0°              |
+    +----------+-----------------------------+-------------------------------+
+    | 2        | -x                          | lon 180°, lat 0°              |
+    +----------+-----------------------------+-------------------------------+
+    | 3        | -y                          | lon 90°W, lat 0°              |
+    +----------+-----------------------------+-------------------------------+
+    | 4        | +z                          | North Pole region             |
+    +----------+-----------------------------+-------------------------------+
+    | 5        | -z                          | South Pole region             |
+    +----------+-----------------------------+-------------------------------+
+
+    Parameters
+    ----------
+    c : int
+        Panel resolution parameter. The generated panel will have ``c x c`` faces
+        and ``(c + 1) x (c + 1)`` nodes.
+    panel_id : int
+        Identifier of the target panel in ``[0, 5]``.
+
+    Notes
+    -----
+    The builder computes panel-local node and face positions, rotates them to the
+    requested panel orientation, converts them to latitude/longitude, and stores
+    the connectivity arrays required to construct an Iris UGRID mesh.
+
+    Example
+    -------
+    >>> panel_builder = PanelBuilder(4, 0)
+    >>> panel_mesh = panel_builder.to_iris_mesh()
+    """
+
     def __init__(self, c: int, panel_id: int):
         if panel_id not in range(6):
             raise ValueError(
@@ -39,6 +82,19 @@ class PanelBuilder:
         self.face_lats, self.face_lons = self._face_points_plane.to_lat_lon()
 
     def to_iris_mesh(self):
+        """
+        Construct and return an Iris Mesh object for this panel.
+
+        Builds node and face auxiliary coordinates from the panel's latitude and
+        longitude arrays, along with face-node and face-face connectivity arrays,
+        and assembles them into an :class:`iris.experimental.ugrid.Mesh`.
+
+        Returns
+        -------
+        iris.experimental.ugrid.Mesh
+            An Iris Mesh object representing the panel, including node coordinates,
+            face coordinates, face-node connectivity, and face-face connectivity.
+        """
         node_x_auxcoord = iris.coords.AuxCoord(
             points=self.node_lons.flatten(),
             standard_name="longitude",
@@ -79,19 +135,6 @@ class PanelBuilder:
             face_coords_and_axes=[(face_x_auxcoord, "x"), (face_y_auxcoord, "y")],
         )
         return mesh
-
-    def to_iris_cube(self, data=None):
-        if data is None:
-            data = np.arange(self.c**2)
-        mesh = self.to_iris_mesh()
-        location = "face"
-        mesh_coord_x, mesh_coord_y = mesh.to_MeshCoords(location)
-        cube = iris.cube.Cube(
-            data=data,
-            long_name=f"{location}_data_panel_{self.panel_id}",
-            aux_coords_and_dims=[(mesh_coord_x, 0), (mesh_coord_y, 0)],
-        )
-        return cube
 
 
 def _generate_panel_0_plane_cartesian_coordinates(c: int):
@@ -160,7 +203,7 @@ class CartesianPoints:
 
         Returns
         -------
-        tuple[np.ndarray, np.ndarray]
+        tuple[numpy.ndarray, numpy.ndarray]
             Arrays of latitude and longitude coordinates, respectively
         """
         xy_radius = np.hypot(self.x, self.y)
@@ -183,11 +226,13 @@ def generate_face_node_connectivity_array(c: int):
     For c=2, there are 2 faces and 3 nodes along each edge of the panel.
     The arrangement looks like this:
 
-    [0]---[1]---[2]
-     | (0) | (1) |
-    [3]---[4]---[5]
-     | (2) | (3) |
-    [6]---[7]---[8]
+    .. code-block::
+
+       [0]---[1]---[2]
+        | (0) | (1) |
+       [3]---[4]---[5]
+        | (2) | (3) |
+       [6]---[7]---[8]
 
     Key:
     [i] = node i
@@ -211,7 +256,7 @@ def generate_face_node_connectivity_array(c: int):
 
     Returns
     -------
-    np.ma.array
+    numpy.ma.MaskedArray
         An array of shape (c**2, 4) mapping each face to its 4 nodes
     """
     node_indices = np.arange((c + 1) ** 2).reshape(c + 1, c + 1)
@@ -243,11 +288,13 @@ def generate_face_face_connectivity_array(c: int):
     For c=2, there are 2 faces and 3 nodes along each edge of the panel.
     The arrangement looks like this:
 
-    [0]---[1]---[2]
-     | (0) | (1) |
-    [3]---[4]---[5]
-     | (2) | (3) |
-    [6]---[7]---[8]
+    .. code-block::
+
+       [0]---[1]---[2]
+        | (0) | (1) |
+       [3]---[4]---[5]
+        | (2) | (3) |
+       [6]---[7]---[8]
 
     Key:
     [i] = node i
@@ -276,7 +323,7 @@ def generate_face_face_connectivity_array(c: int):
 
     Returns
     -------
-    np.ma.array
+    numpy.ma.MaskedArray
         An array of shape (c**2, 4) mapping each face to its neighbouring faces
     """
     face_indices = np.arange(c**2).reshape(c, c)
@@ -292,6 +339,25 @@ def generate_face_face_connectivity_array(c: int):
 
 
 def rotate(cartesian_points: CartesianPoints, target: int):
+    """Rotate points from panel 0 orientation to the target panel orientation.
+
+    Parameters
+    ----------
+    cartesian_points : CartesianPoints
+        Points expressed in panel 0 orientation.
+    target : int
+        Target panel identifier in the range 0 to 5.
+
+    Returns
+    -------
+    CartesianPoints
+        Rotated points in the target panel orientation.
+
+    Raises
+    ------
+    ValueError
+        If ``target`` is not a valid panel identifier.
+    """
     match target:
         case 0:
             return cartesian_points
