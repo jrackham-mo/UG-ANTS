@@ -11,12 +11,12 @@ from iris.experimental.ugrid import Connectivity, Mesh
 
 
 def panel_mesh(c: int, panel_id: int):
-    panel = Panel(c, panel_id)
+    panel = PanelBuilder(c, panel_id)
     mesh = panel.to_iris_mesh()
     return mesh
 
 
-class Panel:
+class PanelBuilder:
     def __init__(self, c: int, panel_id: int):
         if panel_id not in range(6):
             raise ValueError(
@@ -24,32 +24,19 @@ class Panel:
             )
         self.c = c
         self.panel_id = panel_id
+
+        self.face_face_connectivity_array = generate_face_face_connectivity_array(c)
+        self.face_node_connectivity_array = generate_face_node_connectivity_array(c)
+
         panel_0_node_points, panel_0_face_points = (
-            self._generate_panel_0_plane_cartesian_coordinates()
+            _generate_panel_0_plane_cartesian_coordinates(self.c)
         )
-        if panel_id < 4:
-            # Equatorial panels
-            # Rotate panel 0 by a multiple of 90 degrees in longitude
-            self.node_lats, self.node_lons = panel_0_node_points.to_lat_lon()
-            self.face_lats, self.face_lons = panel_0_face_points.to_lat_lon()
-            self.node_lons += panel_id * 90.0
-            self.face_lons += panel_id * 90.0
 
-        elif panel_id == 4:
-            # North polar panel
-            # Rotate panel 0 by 90 degrees "upwards"
-            panel_4_node_points = rotate_panel_0_to_4(panel_0_node_points)
-            panel_4_face_points = rotate_panel_0_to_4(panel_0_face_points)
-            self.node_lats, self.node_lons = panel_4_node_points.to_lat_lon()
-            self.face_lats, self.face_lons = panel_4_face_points.to_lat_lon()
+        self._node_points_plane = rotate(panel_0_node_points, panel_id)
+        self._face_points_plane = rotate(panel_0_face_points, panel_id)
 
-        elif panel_id == 5:
-            # South polar panel
-            # Rotate panel 0 by 90 degrees "downwards"
-            panel_5_node_points = rotate_panel_0_to_5(panel_0_node_points)
-            panel_5_face_points = rotate_panel_0_to_5(panel_0_face_points)
-            self.node_lats, self.node_lons = panel_5_node_points.to_lat_lon()
-            self.face_lats, self.face_lons = panel_5_face_points.to_lat_lon()
+        self.node_lats, self.node_lons = self._node_points_plane.to_lat_lon()
+        self.face_lats, self.face_lons = self._face_points_plane.to_lat_lon()
 
     def to_iris_mesh(self):
         node_x_auxcoord = iris.coords.AuxCoord(
@@ -77,11 +64,11 @@ class Panel:
             long_name="face_y_coordinates",
         )
         face_node_connectivity = Connectivity(
-            generate_face_node_connectivity_array(self.c),
+            self.face_node_connectivity_array,
             cf_role="face_node_connectivity",
         )
         face_face_connectivity = Connectivity(
-            generate_face_face_connectivity_array(self.c),
+            self.face_face_connectivity_array,
             cf_role="face_face_connectivity",
         )
         mesh = Mesh(
@@ -101,44 +88,42 @@ class Panel:
         mesh_coord_x, mesh_coord_y = mesh.to_MeshCoords(location)
         cube = iris.cube.Cube(
             data=data,
-            long_name=f"{location}_data",
+            long_name=f"{location}_data_panel_{self.panel_id}",
             aux_coords_and_dims=[(mesh_coord_x, 0), (mesh_coord_y, 0)],
         )
         return cube
 
-    def _generate_panel_0_plane_cartesian_coordinates(self):
-        """Generate points on the x=1 plane representing the nodes and faces.
 
-        Points are spaced equally in angle, so that they are more evenly distributed
-        on the surface of the sphere.
+def _generate_panel_0_plane_cartesian_coordinates(c: int):
+    """Generate points on the x=1 plane representing the nodes and faces.
 
-        Parameters
-        ----------
-        c : int
-            The number of faces along the panel edge
+    Points are spaced equally in angle, so that they are more evenly distributed
+    on the surface of the sphere.
 
-        Returns
-        -------
-        tuple[CartesianPoints, CartesianPoints]
-        """
-        # Alphas are angles about the z-axis
-        # Betas are angles about the y-axis
-        node_alphas = np.linspace(-np.pi / 4, np.pi / 4, self.c + 1)
-        node_betas = np.linspace(np.pi / 4, -np.pi / 4, self.c + 1)
-        face_alphas = 0.5 * (node_alphas[:-1] + node_alphas[1:])
-        face_betas = 0.5 * (node_betas[:-1] + node_betas[1:])
+    Parameters
+    ----------
+    c : int
+        The number of faces along the panel edge
 
-        node_alphas_grid, node_betas_grid = np.meshgrid(node_alphas, node_betas)
-        face_alphas_grid, face_betas_grid = np.meshgrid(face_alphas, face_betas)
+    Returns
+    -------
+    node_points, face_points: tuple[CartesianPoints, CartesianPoints]
 
-        node_points = CartesianPoints.from_panel_angles(
-            node_alphas_grid, node_betas_grid
-        )
-        face_points = CartesianPoints.from_panel_angles(
-            face_alphas_grid, face_betas_grid
-        )
+    """
+    # Alphas are angles about the z-axis
+    # Betas are angles about the y-axis
+    node_alphas = np.linspace(-np.pi / 4, np.pi / 4, c + 1)
+    node_betas = np.linspace(np.pi / 4, -np.pi / 4, c + 1)
+    face_alphas = 0.5 * (node_alphas[:-1] + node_alphas[1:])
+    face_betas = 0.5 * (node_betas[:-1] + node_betas[1:])
 
-        return node_points, face_points
+    node_alphas_grid, node_betas_grid = np.meshgrid(node_alphas, node_betas)
+    face_alphas_grid, face_betas_grid = np.meshgrid(face_alphas, face_betas)
+
+    node_points = CartesianPoints.from_panel_angles(node_alphas_grid, node_betas_grid)
+    face_points = CartesianPoints.from_panel_angles(face_alphas_grid, face_betas_grid)
+
+    return node_points, face_points
 
 
 @dataclass
@@ -306,35 +291,53 @@ def generate_face_face_connectivity_array(c: int):
     return connectivity_array
 
 
-def rotate_panel_0_to_1(cartesian_points: CartesianPoints) -> CartesianPoints:
+def rotate(cartesian_points: CartesianPoints, target: int):
+    match target:
+        case 0:
+            return cartesian_points
+        case 1:
+            return _rotate_panel_0_to_1(cartesian_points)
+        case 2:
+            return _rotate_panel_0_to_2(cartesian_points)
+        case 3:
+            return _rotate_panel_0_to_3(cartesian_points)
+        case 4:
+            return _rotate_panel_0_to_4(cartesian_points)
+        case 5:
+            return _rotate_panel_0_to_5(cartesian_points)
+        case _:
+            raise ValueError(f"Invalid panel id: {target}")
+
+
+def _rotate_panel_0_to_1(cartesian_points: CartesianPoints) -> CartesianPoints:
     x = -cartesian_points.y
     y = cartesian_points.x
     z = cartesian_points.z
     return CartesianPoints(x, y, z)
 
 
-def rotate_panel_0_to_2(cartesian_points: CartesianPoints) -> CartesianPoints:
+def _rotate_panel_0_to_2(cartesian_points: CartesianPoints) -> CartesianPoints:
     x = -cartesian_points.x
     y = -cartesian_points.y
     z = cartesian_points.z
     return CartesianPoints(x, y, z)
 
 
-def rotate_panel_0_to_3(cartesian_points: CartesianPoints) -> CartesianPoints:
+def _rotate_panel_0_to_3(cartesian_points: CartesianPoints) -> CartesianPoints:
     x = cartesian_points.y
     y = -cartesian_points.x
     z = cartesian_points.z
     return CartesianPoints(x, y, z)
 
 
-def rotate_panel_0_to_4(cartesian_points: CartesianPoints) -> CartesianPoints:
+def _rotate_panel_0_to_4(cartesian_points: CartesianPoints) -> CartesianPoints:
     x = -cartesian_points.z
     y = cartesian_points.y
     z = cartesian_points.x
     return CartesianPoints(x, y, z)
 
 
-def rotate_panel_0_to_5(cartesian_points: CartesianPoints) -> CartesianPoints:
+def _rotate_panel_0_to_5(cartesian_points: CartesianPoints) -> CartesianPoints:
     x = cartesian_points.z
     y = cartesian_points.y
     z = -cartesian_points.x
