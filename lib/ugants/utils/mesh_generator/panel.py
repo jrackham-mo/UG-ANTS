@@ -171,22 +171,49 @@ def _generate_panel_0_plane_cartesian_coordinates(c: int):
 
 @dataclass
 class CartesianPoints:
+    """Cartesian coordinates for an array of points."""
+
     x: np.ndarray
     y: np.ndarray
     z: np.ndarray
 
     @classmethod
     def from_panel_angles(cls, alphas: np.ndarray, betas: np.ndarray):
+        r"""Convert panel angles to cartesian coordinates in the x=1 plane.
+
+        The resulting coordinate is defined by the intersection between three planes:
+
+        - x = 1
+        - The plane passing through the z axis making an angle of alpha with y = 0
+        - The plane passing through the y axis making an angle of alpha with z = 0
+
+        Mathematically, this corresponds to:
+
+        .. math::
+
+           x &= 1
+
+           y &= \tan(\alpha)
+
+           z &= \tan(\beta)
+
+        Parameters
+        ----------
+        alphas : numpy.ndarray
+            Angles about the z axis, in radians. Anticlockwise = positive.
+        betas : numpy.ndarray
+            Angles about the y axis, in radians. Anticlockwise = positive.
+        """
         z = np.tan(betas)
         y = np.tan(alphas)
         x = np.ones_like(y)
         return CartesianPoints(x, y, z)
 
     @property
-    def r(self):
+    def _r(self):
         return np.sqrt(np.square(self.x) + np.square(self.y) + np.square(self.z))
 
-    def project_to_unit_sphere(self):
+    def _project_to_unit_sphere(self):
         r = self.r
         x = self.x / r
         y = self.y / r
