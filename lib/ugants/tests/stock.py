@@ -20,6 +20,7 @@ from iris.cube import Cube
 from iris.experimental.ugrid import Connectivity, Mesh
 from iris.tests.stock.mesh import sample_mesh, sample_mesh_cube
 
+from ugants.utils.cube import mesh2cube
 from ugants.utils.mesh_generator.panel import PanelBuilder
 
 
@@ -28,6 +29,13 @@ def panel_mesh(c: int, panel_id: int = 0):
     panel_builder = PanelBuilder(c, panel_id)
     mesh = panel_builder.to_iris_mesh()
     return mesh
+
+
+def panel_mesh_cube(c: int, panel_id: int = 0, data=None):
+    """Generate a test cube on a mesh consisting of a single panel."""
+    mesh = panel_mesh(c, panel_id)
+    cube = mesh2cube(mesh, data)
+    return cube
 
 
 def mesh_cube(number_of_levels=0, include_mesh_dimcoord=False, **sample_mesh_kwargs):
