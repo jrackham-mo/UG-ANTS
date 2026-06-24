@@ -53,9 +53,10 @@ def test_4by4():
             [11, 14, -1, -1],
         ]
     )
+    mask = data == -1
     expected = np.ma.masked_array(
         data=data,
-        mask=data == -1,
+        mask=mask,
         fill_value=999999,
     )
     assert_masked_array_equal(connectivity, expected)

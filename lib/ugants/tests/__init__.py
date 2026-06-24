@@ -109,7 +109,7 @@ def assert_masked_array_equal(actual: np.ma.MaskedArray, expected: np.ma.MaskedA
     )
     # Check unmasked data are equal
     np.testing.assert_array_equal(
-        actual.data[~actual.mask],
-        expected.data[~expected.mask],
+        actual.data[~np.ma.getmaskarray(actual)],
+        expected.data[~np.ma.getmaskarray(expected)],
         err_msg="Inconsistent unmasked data",
     )
