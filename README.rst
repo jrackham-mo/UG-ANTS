@@ -11,6 +11,9 @@ As per `Semantic Versioning <https://semver.org/#spec-item-4>`_, as UG-ANTS is
 not yet at version 1.0, anything MAY change at any time. The public API SHOULD
 NOT be considered stable.
 
+Development practices for this repository are described in the
+`ANTS Working Practices <https://metoffice.github.io/ancil-working-practices/index.html>`_.
+
 Copyright and licence
 ---------------------
 © Crown Copyright, Met Office. All rights reserved.
