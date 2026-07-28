@@ -60,6 +60,74 @@ def cubedsphere_mesh(side_length):
     return mesh
 
 
+def panel_mesh(side_length, orientation):
+    orientation_map = {
+        "+x": (1, 0, 0),
+        "-x": (-1, 0, 0),
+        "+y": (0, 1, 0),
+        "-y": (0, -1, 0),
+        "+z": (0, 0, 1),
+        "-z": (0, 0, -1),
+    }
+    direction = orientation_map[orientation]
+    plane_polydata = pv.Plane(
+        center=direction,
+        direction=direction,
+        i_size=2,
+        j_size=2,
+        i_resolution=side_length,
+        j_resolution=side_length,
+    )
+
+    cell_centres_polydata = plane_polydata.cell_centers()
+
+    node_lats, node_lons = calculate_lat_lon(plane_polydata.points)
+    face_lats, face_lons = calculate_lat_lon(cell_centres_polydata.points)
+
+    face_node_indices = plane_polydata.regular_faces
+
+    # TODO: create face-face connectivity, but not all faces connect to 4 others
+
+    node_x_aux = AuxCoord(
+        points=node_lons,
+        standard_name="longitude",
+        units="degrees_east",
+        long_name="node_x_coordinates",
+    )
+    node_y_aux = AuxCoord(
+        points=node_lats,
+        standard_name="latitude",
+        units="degrees_north",
+        long_name="node_y_coordinates",
+    )
+    face_x_aux = AuxCoord(
+        points=face_lons,
+        standard_name="longitude",
+        units="degrees_east",
+        long_name="face_x_coordinates",
+    )
+    face_y_aux = AuxCoord(
+        points=face_lats,
+        standard_name="latitude",
+        units="degrees_north",
+        long_name="face_y_coordinates",
+    )
+    face_node_connectivity = Connectivity(
+        indices=face_node_indices, cf_role="face_node_connectivity", start_index=0
+    )
+    face_face_connectivity = Connectivity(
+        indices=face_face_indices, cf_role="face_face_connectivity", start_index=0
+    )
+    mesh = Mesh(
+        long_name="my_mesh",
+        topology_dimension=2,
+        node_coords_and_axes=[(node_x_aux, "x"), (node_y_aux, "y")],
+        connectivities=[face_node_connectivity, face_face_connectivity],
+        face_coords_and_axes=[(face_x_aux, "x"), (face_y_aux, "y")],
+    )
+    return mesh
+
+
 def calculate_lat_lon(points):
     x = points[:, 0]
     y = points[:, 1]
