@@ -2,6 +2,8 @@
 #
 # This file is part of UG-ANTS and is released under the BSD 3-Clause license.
 # See LICENSE.txt in the root of the repository for full licensing details.
+# Some of the content of this file has been produced with the assistance of
+# Met Office GitHub Copilot Enterprise.
 import numpy as np
 import pyvista as pv
 from iris.coords import AuxCoord
@@ -61,6 +63,7 @@ def cubedsphere_mesh(side_length):
 
 
 def panel_mesh(side_length, orientation):
+    n_faces = side_length * side_length
     orientation_map = {
         "+x": (1, 0, 0),
         "-x": (-1, 0, 0),
@@ -86,7 +89,10 @@ def panel_mesh(side_length, orientation):
 
     face_node_indices = plane_polydata.regular_faces
 
-    # TODO: create face-face connectivity, but not all faces connect to 4 others
+    face_face_indices = np.ma.masked_all((n_faces, 4), dtype=int)
+    for face_id in range(n_faces):
+        connected_faces = plane_polydata.cell_neighbors(face_id, "edges")
+        face_face_indices[face_id, : len(connected_faces)] = connected_faces
 
     node_x_aux = AuxCoord(
         points=node_lons,
