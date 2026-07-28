@@ -9,13 +9,16 @@ from iris.experimental.ugrid import Connectivity, Mesh, save_mesh
 
 
 def cubedsphere_mesh(side_length):
-    box_polydata = pv.Box(level=side_length + 1)
+    box_polydata = pv.Box(level=side_length - 1)
     cell_centres_polydata = box_polydata.cell_centers()
 
     node_lats, node_lons = calculate_lat_lon(box_polydata.points)
     face_lats, face_lons = calculate_lat_lon(cell_centres_polydata.points)
 
     face_node_indices = box_polydata.regular_faces
+    face_face_indices = np.array(
+        [box_polydata.cell_neighbors(i, "edges") for i in range(box_polydata.n_cells)]
+    )
 
     node_x_aux = AuxCoord(
         points=node_lons,
@@ -44,11 +47,14 @@ def cubedsphere_mesh(side_length):
     face_node_connectivity = Connectivity(
         indices=face_node_indices, cf_role="face_node_connectivity", start_index=0
     )
+    face_face_connectivity = Connectivity(
+        indices=face_face_indices, cf_role="face_face_connectivity", start_index=0
+    )
     mesh = Mesh(
         long_name="my_mesh",
         topology_dimension=2,
         node_coords_and_axes=[(node_x_aux, "x"), (node_y_aux, "y")],
-        connectivities=[face_node_connectivity],
+        connectivities=[face_node_connectivity, face_face_connectivity],
         face_coords_and_axes=[(face_x_aux, "x"), (face_y_aux, "y")],
     )
     return mesh
