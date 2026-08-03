@@ -416,7 +416,7 @@ def mesh2cube(mesh: Mesh, data=None) -> Cube:
     location = "face"
     n_faces = len(mesh.face_coords.face_x.points)
     if data is None:
-        data = np.arange(n_faces)
+        data = np.ma.arange(n_faces, dtype=float)
     mesh_coord_x, mesh_coord_y = mesh.to_MeshCoords(location)
     cube = iris.cube.Cube(
         data=data,
