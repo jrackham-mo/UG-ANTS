@@ -15,10 +15,86 @@ from itertools import pairwise
 import geovista as gv
 import iris.coord_systems
 import numpy as np
+import pyvista as pv
 from iris.coords import AuxCoord, DimCoord
 from iris.cube import Cube
 from iris.experimental.ugrid import Connectivity, Mesh
 from iris.tests.stock.mesh import sample_mesh, sample_mesh_cube
+
+from ugants.utils.cube import mesh2cube
+
+from ._mesh import _polydata_to_mesh
+
+
+def cubedsphere_cube(side_length, data=None):
+    """Generate a cubed-sphere mesh for tests.
+
+    Parameters
+    ----------
+    side_length : int
+        Length of one side of the cubed-sphere mesh.
+    data : np.array_like
+        Data to be added to the faces of the cube.
+
+    Returns
+    -------
+    :class:`iris.experimental.ugrid.Mesh`
+        Mesh created from a PyVista box representation.
+
+    Important
+    ---------
+    This function is intended for unit testing purposes only. It should *not*
+    be used for ancillary generation.
+
+    Side lengths over 12 are not supported.
+
+    See Also
+    --------
+    PyVista Box:
+        https://docs.pyvista.org/api/utilities/_autosummary/pyvista.box
+    """
+    mesh = cubedsphere_mesh(side_length)
+    cube = mesh2cube(mesh, data)
+    return cube
+
+
+def cubedsphere_mesh(side_length):
+    """Generate a cubed-sphere mesh for tests.
+
+    Parameters
+    ----------
+    side_length : int
+        Length of one side of the cubed-sphere mesh.
+
+    Returns
+    -------
+    :class:`iris.experimental.ugrid.Mesh`
+        Mesh created from a PyVista box representation.
+
+    Important
+    ---------
+    This function is intended for unit testing purposes only. It should *not*
+    be used for ancillary generation.
+
+    Side lengths over 12 are not supported.
+
+    See Also
+    --------
+    PyVista Box:
+        https://docs.pyvista.org/api/utilities/_autosummary/pyvista.box
+    """
+    if side_length < 1:
+        raise ValueError(
+            f"Cubedsphere side length must be positive (requested {side_length})"
+        )
+    if side_length > 12:
+        raise ValueError(
+            "The cubedsphere mesh generator does not support "
+            f"side lengths above 12 (requested {side_length})"
+        )
+    box_polydata = pv.Box(level=side_length - 1)
+    mesh = _polydata_to_mesh(box_polydata)
+    return mesh
 
 
 def mesh_cube(number_of_levels=0, include_mesh_dimcoord=False, **sample_mesh_kwargs):

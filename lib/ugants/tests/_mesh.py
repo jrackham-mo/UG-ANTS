@@ -10,12 +10,6 @@ from iris.coords import AuxCoord
 from iris.experimental.ugrid import Connectivity, Mesh
 
 
-def cubedsphere_mesh(side_length):
-    box_polydata = pv.Box(level=side_length - 1)
-    mesh = _polydata_to_mesh(box_polydata)
-    return mesh
-
-
 def _polydata_to_mesh(polydata: pv.PolyData):
     cell_centres_polydata = polydata.cell_centers()
 
@@ -125,8 +119,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
     print(args)
     match args.command:
-        case "cubedsphere":
-            mesh = cubedsphere_mesh(args.side_length)
         case "panel":
             mesh = panel_mesh(args.side_length, args.orientation)
 
