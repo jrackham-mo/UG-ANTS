@@ -13,6 +13,8 @@ from iris.coords import AuxCoord
 from iris.cube import Cube, CubeList
 from iris.experimental.ugrid import Connectivity, Mesh
 
+from ugants.utils.cube import get_connectivity_indices
+
 
 def mesh_to_cube(mesh, dtype: np.dtype = np.float64):
     """Turn a mesh into a :class:`iris.cube.Cube` with data using ``np.nan``.
@@ -476,7 +478,7 @@ def _add_padding(minimum, maximum, padding_fraction=0.1):
     return minimum, maximum
 
 
-def get_faces_that_overlap_bounds(cube, bounds, index=1):
+def get_faces_that_overlap_bounds(cube, bounds):
     """Get the indices of faces with one or more nodes within given latitude bounds.
 
     Parameters
@@ -493,9 +495,8 @@ def get_faces_that_overlap_bounds(cube, bounds, index=1):
     """
     min_lat, max_lat = min(bounds), max(bounds)
     min_lat, max_lat = _add_padding(min_lat, max_lat)
-    node_indices = np.ravel(cube.mesh.face_node_connectivity.indices)
-    start_index = cube.mesh.face_node_connectivity.start_index
-    node_latitudes = cube.mesh.node_coords.node_y.points[node_indices - start_index]
+    node_indices = np.ravel(get_connectivity_indices(cube, "face_node_connectivity"))
+    node_latitudes = cube.mesh.node_coords.node_y.points[node_indices]
     node_mask = (min_lat <= node_latitudes) & (node_latitudes <= max_lat)
     face_node_mask = np.reshape(
         node_mask, cube.mesh.face_node_connectivity.indices.shape

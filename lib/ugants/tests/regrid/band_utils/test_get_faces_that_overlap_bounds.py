@@ -23,19 +23,19 @@ class TestFacesThatOverlapBounds:
         # For these bounds we would expect faces [0,3,6]
         bounds = (0, 1)
         expected = [True, False, False, True, False, False, True, False, False]
-        result = get_faces_that_overlap_bounds(self.cube, bounds, index=0)
+        result = get_faces_that_overlap_bounds(self.cube, bounds)
         assert all(expected == result)
 
     def test_shared_nodes(self):
         # For these bounds we would expect faces [1,2,4,5,7,8]
         bounds = (9, 11)
         expected = [False, True, True, False, True, True, False, True, True]
-        result = get_faces_that_overlap_bounds(self.cube, bounds, index=0)
+        result = get_faces_that_overlap_bounds(self.cube, bounds)
         assert all(expected == result)
 
     def test_top_boundary_nodes(self):
         # For these bounds we would expect faces [2,5,8]
         bounds = (14, 15)
         expected = [False, False, True, False, False, True, False, False, True]
-        result = get_faces_that_overlap_bounds(self.cube, bounds, index=0)
+        result = get_faces_that_overlap_bounds(self.cube, bounds)
         assert all(expected == result)
