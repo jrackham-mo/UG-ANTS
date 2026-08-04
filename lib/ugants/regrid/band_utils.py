@@ -201,7 +201,9 @@ def reconstruct_mesh_cube(cube: Cube, mesh_dim: int):
         raise ValueError("The provided cube already has a mesh.")
 
     reconstructed_cube = cube.copy()
-    mesh = Mesh.from_coords(*reconstructed_cube.coords(dimensions=mesh_dim))
+    x_coord = reconstructed_cube.coord(axis="x")
+    y_coord = reconstructed_cube.coord(axis="y")
+    mesh = Mesh.from_coords(x_coord, y_coord)
     # This mesh is not complete, nodes are duplicated
     #
     # Example
@@ -492,7 +494,8 @@ def get_faces_that_overlap_bounds(cube, bounds, index=1):
     min_lat, max_lat = min(bounds), max(bounds)
     min_lat, max_lat = _add_padding(min_lat, max_lat)
     node_indices = np.ravel(cube.mesh.face_node_connectivity.indices)
-    node_latitudes = cube.mesh.node_coords.node_y.points[node_indices - index]
+    start_index = cube.mesh.face_node_connectivity.start_index
+    node_latitudes = cube.mesh.node_coords.node_y.points[node_indices - start_index]
     node_mask = (min_lat <= node_latitudes) & (node_latitudes <= max_lat)
     face_node_mask = np.reshape(
         node_mask, cube.mesh.face_node_connectivity.indices.shape

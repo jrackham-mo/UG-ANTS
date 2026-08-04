@@ -16,7 +16,7 @@ def _polydata_to_mesh(polydata: pv.PolyData):
     node_lats, node_lons = calculate_lat_lon(polydata.points)
     face_lats, face_lons = calculate_lat_lon(cell_centres_polydata.points)
 
-    face_node_indices = polydata.regular_faces
+    face_node_indices = np.ma.asarray(polydata.regular_faces)
 
     n_faces = polydata.n_cells
     face_face_indices = np.ma.masked_all((n_faces, 4), dtype=int)
