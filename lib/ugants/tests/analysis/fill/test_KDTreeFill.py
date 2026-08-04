@@ -9,8 +9,6 @@ from unittest import mock
 import numpy as np
 import pytest
 from ugants.analysis.fill import KDTreeFill
-from ugants.io import load
-from ugants.tests import get_data_path
 from ugants.tests.stock import cubedsphere_cube
 
 pytestmark = pytest.mark.filterwarnings(
@@ -78,24 +76,21 @@ class TestNoTargetMask:
 
         assert actual == expected
 
-    def test_masked_cell(self):
-        data_C4 = load.ugrid(get_data_path("data_C4.nc"))
-        sample_data = data_C4.extract_cube("sample_data")
-
+    def test_masked_cell(self, sample_data):
         source = sample_data.copy()
-        source.data = np.ma.masked_where(source.data == 26.0, source.data)
+        source.data = np.ma.asarray(source.data)
+        source.data[25] = np.ma.masked
 
         filler = KDTreeFill(source)
         actual = filler(source)
 
         expected = sample_data.copy()
-        expected.data[25] = expected.data[26]
+        expected.data[25] = expected.data[24]
 
         assert actual == expected
 
     def test_no_mask_no_nan(self):
-        data_C4 = load.ugrid(get_data_path("data_C4.nc"))
-        sample_data = data_C4.extract_cube("sample_data")
+        sample_data = cubedsphere_cube(4)
 
         source = sample_data.copy()
         filler = KDTreeFill(source)
