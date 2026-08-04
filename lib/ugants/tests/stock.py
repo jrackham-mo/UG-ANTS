@@ -55,6 +55,11 @@ def cubedsphere_cube(side_length, data=None):
     """
     mesh = cubedsphere_mesh(side_length)
     cube = mesh2cube(mesh, data)
+    panel_number = AuxCoord(
+        points=np.repeat(np.arange(6), cube.shape[0] / 6),
+        long_name="panel_number",
+    )
+    cube.add_aux_coord(panel_number, 0)
     return cube
 
 
