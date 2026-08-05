@@ -64,28 +64,6 @@ def _polydata_to_mesh(polydata: pv.PolyData):
     return mesh
 
 
-def panel_mesh(side_length, orientation):
-    orientation_map = {
-        "+x": (1, 0, 0),
-        "-x": (-1, 0, 0),
-        "+y": (0, 1, 0),
-        "-y": (0, -1, 0),
-        "+z": (0, 0, 1),
-        "-z": (0, 0, -1),
-    }
-    direction = orientation_map[orientation]
-    plane_polydata = pv.Plane(
-        center=direction,
-        direction=direction,
-        i_size=2,
-        j_size=2,
-        i_resolution=side_length,
-        j_resolution=side_length,
-    )
-    mesh = _polydata_to_mesh(plane_polydata)
-    return mesh
-
-
 def calculate_lat_lon(points):
     x = points[:, 0]
     y = points[:, 1]
@@ -94,33 +72,3 @@ def calculate_lat_lon(points):
     lats = np.degrees(np.arctan2(z, xy))
     lons = np.degrees(np.arctan2(y, x))
     return lats, lons
-
-
-if __name__ == "__main__":
-    import argparse
-    import pathlib
-
-    from ugants.io.save import ugrid
-    from ugants.utils.cube import mesh2cube
-
-    parser = argparse.ArgumentParser()
-
-    subparsers = parser.add_subparsers(dest="command", required=True)
-
-    cubedsphere_subparser = subparsers.add_parser("cubedsphere")
-    cubedsphere_subparser.add_argument("side_length", type=int)
-
-    panel_subparser = subparsers.add_parser("panel")
-    panel_subparser.add_argument("side_length", type=int)
-    panel_subparser.add_argument("orientation")
-
-    parser.add_argument("output", type=pathlib.Path)
-
-    args = parser.parse_args()
-    print(args)
-    match args.command:
-        case "panel":
-            mesh = panel_mesh(args.side_length, args.orientation)
-
-    cube = mesh2cube(mesh)
-    ugrid(cube, args.output)

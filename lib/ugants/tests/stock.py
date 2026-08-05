@@ -26,8 +26,8 @@ from ugants.utils.cube import mesh2cube
 from ._mesh import _polydata_to_mesh
 
 
-def cubedsphere_cube(side_length, data=None):
-    """Generate a cubed-sphere mesh for tests.
+def cubedsphere_cube(side_length, data=None) -> Cube:
+    """Generate a cube defined on a cubed-sphere mesh for tests.
 
     Parameters
     ----------
@@ -38,8 +38,8 @@ def cubedsphere_cube(side_length, data=None):
 
     Returns
     -------
-    :class:`iris.experimental.ugrid.Mesh`
-        Mesh created from a PyVista box representation.
+    :class:`iris.cube.Cube`
+        Cube with a mesh created from a PyVista box representation.
 
     Important
     ---------
@@ -63,7 +63,7 @@ def cubedsphere_cube(side_length, data=None):
     return cube
 
 
-def cubedsphere_mesh(side_length):
+def cubedsphere_mesh(side_length) -> Mesh:
     """Generate a cubed-sphere mesh for tests.
 
     Parameters
@@ -99,6 +99,99 @@ def cubedsphere_mesh(side_length):
         )
     box_polydata = pv.Box(level=side_length - 1)
     mesh = _polydata_to_mesh(box_polydata)
+    return mesh
+
+
+def panel_cube(side_length, centre_lat=0, centre_lon=0, data=None) -> Cube:
+    """Generate cube defined on a single cubed-sphere panel mesh for tests.
+
+    Parameters
+    ----------
+    side_length : int
+        Length of one side of the cubed-sphere panel mesh.
+    centre_lat : int
+        Latitude of the centre of the panel, in degrees.
+    centre_lon : int
+        Longitude of the centre of the panel, in degrees.
+    data : np.array_like
+        Data to be added to the faces of the cube.
+
+    Returns
+    -------
+    :class:`iris.cube.Cube`
+        Cube with a mesh created from a PyVista plane representation.
+
+    Important
+    ---------
+    This function is intended for unit testing purposes only. It should *not*
+    be used for ancillary generation.
+
+    Side lengths over 12 are not supported.
+
+    See Also
+    --------
+    PyVista Plane:
+        https://docs.pyvista.org/api/utilities/_autosummary/pyvista.plane
+    """
+    mesh = panel_mesh(side_length, centre_lat, centre_lon)
+    cube = mesh2cube(mesh, data)
+    return cube
+
+
+def panel_mesh(side_length, centre_lat=0, centre_lon=0) -> Mesh:
+    """Generate a single cubed-sphere panel mesh for tests.
+
+    Parameters
+    ----------
+    side_length : int
+        Length of one side of the cubed-sphere panel mesh.
+    centre_lat : int
+        Latitude of the centre of the panel, in degrees.
+    centre_lon : int
+        Longitude of the centre of the panel, in degrees.
+
+    Returns
+    -------
+    :class:`iris.experimental.ugrid.Mesh`
+        Mesh created from a PyVista plane representation.
+
+    Important
+    ---------
+    This function is intended for unit testing purposes only. It should *not*
+    be used for ancillary generation.
+
+    Side lengths over 12 are not supported.
+
+    See Also
+    --------
+    PyVista Plane:
+        https://docs.pyvista.org/api/utilities/_autosummary/pyvista.plane
+    """
+    if side_length < 1:
+        raise ValueError(
+            f"Panel side length must be positive (requested {side_length})"
+        )
+    if side_length > 12:
+        raise ValueError(
+            "The panel mesh generator does not support "
+            f"side lengths above 12 (requested {side_length})"
+        )
+    centre_lat_rad = np.radians(centre_lat)
+    centre_lon_rad = np.radians(centre_lon)
+    centre_vector = (
+        np.cos(centre_lat_rad) * np.cos(centre_lon_rad),
+        np.cos(centre_lat_rad) * np.sin(centre_lon_rad),
+        np.sin(centre_lat_rad),
+    )
+    plane_polydata = pv.Plane(
+        center=centre_vector,
+        direction=centre_vector,
+        i_size=2,
+        j_size=2,
+        i_resolution=side_length,
+        j_resolution=side_length,
+    )
+    mesh = _polydata_to_mesh(plane_polydata)
     return mesh
 
 
