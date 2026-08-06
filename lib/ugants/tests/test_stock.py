@@ -117,24 +117,44 @@ class TestPanelMesh(CommonMesh):
             ugants.tests.stock.panel_mesh(13)
 
 
-class TestPanelCube:
-    """Tests for ugants.tests.stock.panel_cube."""
+class CommonCube(ABC):
+    """Base class for testing of stock cubes."""
 
-    @pytest.mark.parametrize("side_length", [1, 2, 4])
+    side_lengths = (1, 2, 4)
+
+    @abstractmethod
+    def make_cube(self, side_length: int) -> Cube:
+        """Build the cube under test."""
+
+    @abstractmethod
+    def expected_shape(self, side_length: int) -> tuple[int, ...]:
+        """Return the expected shape of the cube data."""
+
+    @pytest.mark.parametrize("side_length", side_lengths)
     def test_returns_cube(self, side_length):
-        cube = ugants.tests.stock.panel_cube(side_length)
+        cube = self.make_cube(side_length)
         assert isinstance(cube, Cube)
 
-    @pytest.mark.parametrize("side_length", [1, 2, 4])
+    @pytest.mark.parametrize("side_length", side_lengths)
     def test_shape(self, side_length):
-        cube = ugants.tests.stock.panel_cube(side_length)
-        assert cube.shape == (side_length**2,)
+        cube = self.make_cube(side_length)
+        assert cube.shape == self.expected_shape(side_length)
 
-    @pytest.mark.parametrize("side_length", [1, 2, 4])
+    @pytest.mark.parametrize("side_length", side_lengths)
     def test_has_mesh(self, side_length):
-        cube = ugants.tests.stock.panel_cube(side_length)
+        cube = self.make_cube(side_length)
         assert cube.mesh is not None
         assert isinstance(cube.mesh, Mesh)
+
+
+class TestPanelCube(CommonCube):
+    """Tests for ugants.tests.stock.panel_cube."""
+
+    def make_cube(self, side_length: int) -> Cube:
+        return ugants.tests.stock.panel_cube(side_length)
+
+    def expected_shape(self, side_length: int) -> tuple[int, ...]:
+        return (side_length**2,)
 
     @pytest.mark.parametrize("side_length", [4, 8])
     def test_slam_from_ugrid(self, side_length):
@@ -176,24 +196,14 @@ class TestCubedsphereMesh(CommonMesh):
             ugants.tests.stock.cubedsphere_mesh(13)
 
 
-class TestCubedsphereCube:
+class TestCubedsphereCube(CommonCube):
     """Tests for ugants.tests.stock.cubedsphere_cube."""
 
-    @pytest.mark.parametrize("side_length", [1, 2, 4])
-    def test_returns_cube(self, side_length):
-        cube = ugants.tests.stock.cubedsphere_cube(side_length)
-        assert isinstance(cube, Cube)
+    def make_cube(self, side_length: int) -> Cube:
+        return ugants.tests.stock.cubedsphere_cube(side_length)
 
-    @pytest.mark.parametrize("side_length", [1, 2, 4])
-    def test_shape(self, side_length):
-        cube = ugants.tests.stock.cubedsphere_cube(side_length)
-        assert cube.shape == (6 * side_length**2,)
-
-    @pytest.mark.parametrize("side_length", [1, 2, 4])
-    def test_has_mesh(self, side_length):
-        cube = ugants.tests.stock.cubedsphere_cube(side_length)
-        assert cube.mesh is not None
-        assert isinstance(cube.mesh, Mesh)
+    def expected_shape(self, side_length: int) -> tuple[int, ...]:
+        return (6 * side_length**2,)
 
     @pytest.mark.parametrize("side_length", [1, 2, 4])
     def test_has_panel_number_coord(self, side_length):
