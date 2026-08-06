@@ -136,14 +136,14 @@ class TestPanelCube:
         assert cube.mesh is not None
         assert isinstance(cube.mesh, Mesh)
 
-    @pytest.mark.parametrize("side_length", [2, 4])
+    @pytest.mark.parametrize("side_length", [4, 8])
     def test_slam_from_ugrid(self, side_length):
         cube = ugants.tests.stock.panel_cube(side_length)
         result = slam.Transform.from_ugrid(cube)
         assert isinstance(result, Cube)
         assert result.shape == (side_length, side_length)
 
-    @pytest.mark.parametrize("side_length", [2, 4])
+    @pytest.mark.parametrize("side_length", [4, 8])
     def test_slam_from_ugrid_has_no_mesh(self, side_length):
         cube = ugants.tests.stock.panel_cube(side_length)
         result = slam.Transform.from_ugrid(cube)
