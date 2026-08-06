@@ -4,6 +4,8 @@
 # See LICENSE.txt in the root of the repository for full licensing details.
 # Some of the content of this file has been produced with the assistance of
 # Met Office GitHub Copilot Enterprise.
+from abc import ABC, abstractmethod
+
 import numpy as np
 import pytest
 import slam
@@ -13,58 +15,93 @@ from iris.experimental.ugrid import Mesh
 import ugants.tests.stock
 
 
-class TestPanelMesh:
-    """Tests for ugants.tests.stock.panel_mesh."""
+class CommonMesh(ABC):
+    """Base class for testing of stock meshes."""
 
-    @pytest.mark.parametrize("side_length", [1, 2, 4])
+    side_lengths = (1, 2, 4)
+
+    @abstractmethod
+    def make_mesh(self, side_length: int) -> Mesh:
+        """Build the mesh under test."""
+
+    @abstractmethod
+    def expected_n_faces(self, side_length: int) -> int:
+        """Return the expected number of faces in the mesh."""
+
+    @abstractmethod
+    def expected_n_nodes(self, side_length: int) -> int:
+        """Return the expected number of nodes in the mesh."""
+
+    @pytest.mark.parametrize("side_length", side_lengths)
     def test_returns_mesh(self, side_length):
-        mesh = ugants.tests.stock.panel_mesh(side_length)
+        mesh = self.make_mesh(side_length)
         assert isinstance(mesh, Mesh)
 
-    @pytest.mark.parametrize("side_length", [1, 2, 4])
+    @pytest.mark.parametrize("side_length", side_lengths)
     def test_n_faces(self, side_length):
-        mesh = ugants.tests.stock.panel_mesh(side_length)
-        n_faces = mesh.face_coords.face_x.points.shape[0]
-        assert n_faces == side_length**2
+        mesh = self.make_mesh(side_length)
+        n_faces = mesh.face_node_connectivity.indices.shape[0]
+        assert n_faces == self.expected_n_faces(side_length)
 
-    @pytest.mark.parametrize("side_length", [1, 2, 4])
+    @pytest.mark.parametrize("side_length", side_lengths)
     def test_n_nodes(self, side_length):
-        mesh = ugants.tests.stock.panel_mesh(side_length)
+        mesh = self.make_mesh(side_length)
         n_nodes = mesh.node_coords.node_x.points.shape[0]
-        assert n_nodes == (side_length + 1) ** 2
+        assert n_nodes == self.expected_n_nodes(side_length)
 
-    @pytest.mark.parametrize("side_length", [1, 2, 4])
+    @pytest.mark.parametrize("side_length", side_lengths)
     def test_face_node_connectivity_shape(self, side_length):
-        mesh = ugants.tests.stock.panel_mesh(side_length)
+        mesh = self.make_mesh(side_length)
         indices = mesh.face_node_connectivity.indices
-        assert indices.shape == (side_length**2, 4)
+        assert indices.shape == (self.expected_n_faces(side_length), 4)
 
-    @pytest.mark.parametrize("side_length", [1, 2, 4])
+    @pytest.mark.parametrize("side_length", side_lengths)
     def test_face_node_connectivity_is_masked_array(self, side_length):
-        mesh = ugants.tests.stock.panel_mesh(side_length)
+        mesh = self.make_mesh(side_length)
         assert isinstance(mesh.face_node_connectivity.indices, np.ma.MaskedArray)
 
-    @pytest.mark.parametrize("side_length", [1, 2, 4])
+    @pytest.mark.parametrize("side_length", side_lengths)
     def test_face_face_connectivity_shape(self, side_length):
-        mesh = ugants.tests.stock.panel_mesh(side_length)
+        mesh = self.make_mesh(side_length)
         face_face = mesh.face_face_connectivity
-        assert face_face.indices.shape == (side_length**2, 4)
+        assert face_face.indices.shape == (self.expected_n_faces(side_length), 4)
 
-    @pytest.mark.parametrize("side_length", [2, 4])
+    @pytest.mark.parametrize("side_length", side_lengths)
     def test_face_coords_exist(self, side_length):
-        mesh = ugants.tests.stock.panel_mesh(side_length)
+        mesh = self.make_mesh(side_length)
         assert mesh.face_coords.face_x is not None
         assert mesh.face_coords.face_y is not None
-        assert mesh.face_coords.face_x.points.shape == (side_length**2,)
-        assert mesh.face_coords.face_y.points.shape == (side_length**2,)
+        assert mesh.face_coords.face_x.points.shape == (
+            self.expected_n_faces(side_length),
+        )
+        assert mesh.face_coords.face_y.points.shape == (
+            self.expected_n_faces(side_length),
+        )
 
-    @pytest.mark.parametrize("side_length", [2, 4])
+    @pytest.mark.parametrize("side_length", side_lengths)
     def test_node_coords_exist(self, side_length):
-        mesh = ugants.tests.stock.panel_mesh(side_length)
+        mesh = self.make_mesh(side_length)
         assert mesh.node_coords.node_x is not None
         assert mesh.node_coords.node_y is not None
-        assert mesh.node_coords.node_x.points.shape == ((side_length + 1) ** 2,)
-        assert mesh.node_coords.node_y.points.shape == ((side_length + 1) ** 2,)
+        assert mesh.node_coords.node_x.points.shape == (
+            self.expected_n_nodes(side_length),
+        )
+        assert mesh.node_coords.node_y.points.shape == (
+            self.expected_n_nodes(side_length),
+        )
+
+
+class TestPanelMesh(CommonMesh):
+    """Tests for ugants.tests.stock.panel_mesh."""
+
+    def make_mesh(self, side_length: int) -> Mesh:
+        return ugants.tests.stock.panel_mesh(side_length)
+
+    def expected_n_faces(self, side_length: int) -> int:
+        return side_length**2
+
+    def expected_n_nodes(self, side_length: int) -> int:
+        return (side_length + 1) ** 2
 
     def test_raises_for_zero_side_length(self):
         expected_msg = r"^Panel side length must be positive \(requested 0\)$"
@@ -113,52 +150,17 @@ class TestPanelCube:
         assert result.mesh is None
 
 
-class TestCubedsphereMesh:
+class TestCubedsphereMesh(CommonMesh):
     """Tests for ugants.tests.stock.cubedsphere_mesh."""
 
-    @pytest.mark.parametrize("side_length", [1, 2, 4])
-    def test_returns_mesh(self, side_length):
-        mesh = ugants.tests.stock.cubedsphere_mesh(side_length)
-        assert isinstance(mesh, Mesh)
+    def make_mesh(self, side_length: int) -> Mesh:
+        return ugants.tests.stock.cubedsphere_mesh(side_length)
 
-    @pytest.mark.parametrize("side_length", [1, 2, 4])
-    def test_n_faces(self, side_length):
-        """Expected number of faces is 6(side_length^2)."""
-        mesh = ugants.tests.stock.cubedsphere_mesh(side_length)
-        n_faces = mesh.face_node_connectivity.indices.shape[0]
-        assert n_faces == 6 * side_length**2
+    def expected_n_faces(self, side_length: int) -> int:
+        return 6 * side_length**2
 
-    @pytest.mark.parametrize("side_length", [1, 2, 4])
-    def test_n_nodes(self, side_length):
-        """Expected number of nodes is n_faces + 2 = 6(side_length^2) + 2."""
-        mesh = ugants.tests.stock.cubedsphere_mesh(side_length)
-        n_nodes = mesh.node_coords.node_x.points.shape[0]
-        assert n_nodes == 6 * side_length**2 + 2
-
-    @pytest.mark.parametrize("side_length", [1, 2, 4])
-    def test_face_node_connectivity_shape(self, side_length):
-        mesh = ugants.tests.stock.cubedsphere_mesh(side_length)
-        indices = mesh.face_node_connectivity.indices
-        assert indices.shape == (6 * side_length**2, 4)
-
-    @pytest.mark.parametrize("side_length", [1, 2, 4])
-    def test_face_node_connectivity_is_masked_array(self, side_length):
-        mesh = ugants.tests.stock.cubedsphere_mesh(side_length)
-        assert isinstance(mesh.face_node_connectivity.indices, np.ma.MaskedArray)
-
-    @pytest.mark.parametrize("side_length", [1, 2, 4])
-    def test_face_coords_exist(self, side_length):
-        mesh = ugants.tests.stock.cubedsphere_mesh(side_length)
-        assert mesh.face_coords.face_x is not None
-        assert mesh.face_coords.face_y is not None
-        assert mesh.face_coords.face_x.points.shape == (6 * side_length**2,)
-        assert mesh.face_coords.face_y.points.shape == (6 * side_length**2,)
-
-    @pytest.mark.parametrize("side_length", [1, 2, 4])
-    def test_node_coords_exist(self, side_length):
-        mesh = ugants.tests.stock.cubedsphere_mesh(side_length)
-        assert mesh.node_coords.node_x is not None
-        assert mesh.node_coords.node_y is not None
+    def expected_n_nodes(self, side_length: int) -> int:
+        return 6 * side_length**2 + 2
 
     def test_raises_for_zero_side_length(self):
         expected_msg = r"^Cubedsphere side length must be positive \(requested 0\)$"
