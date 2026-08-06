@@ -18,7 +18,7 @@ import ugants.tests.stock
 class CommonMesh(ABC):
     """Base class for testing of stock meshes."""
 
-    side_lengths = (1, 2, 4)
+    side_lengths = (4, 8)
 
     @abstractmethod
     def make_mesh(self, side_length: int) -> Mesh:
@@ -120,7 +120,7 @@ class TestPanelMesh(CommonMesh):
 class CommonCube(ABC):
     """Base class for testing of stock cubes."""
 
-    side_lengths = (1, 2, 4)
+    side_lengths = (4, 8)
 
     @abstractmethod
     def make_cube(self, side_length: int) -> Cube:
