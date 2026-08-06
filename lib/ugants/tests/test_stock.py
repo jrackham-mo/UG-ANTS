@@ -2,10 +2,210 @@
 #
 # This file is part of UG-ANTS and is released under the BSD 3-Clause license.
 # See LICENSE.txt in the root of the repository for full licensing details.
+# Some of the content of this file has been produced with the assistance of
+# Met Office GitHub Copilot Enterprise.
 import numpy as np
 import pytest
+import slam
+from iris.cube import Cube
+from iris.experimental.ugrid import Mesh
 
-from ugants.tests.stock import regular_lat_lon_mesh
+import ugants.tests.stock
+
+
+class TestPanelMesh:
+    """Tests for ugants.tests.stock.panel_mesh."""
+
+    @pytest.mark.parametrize("side_length", [1, 2, 4])
+    def test_returns_mesh(self, side_length):
+        mesh = ugants.tests.stock.panel_mesh(side_length)
+        assert isinstance(mesh, Mesh)
+
+    @pytest.mark.parametrize("side_length", [1, 2, 4])
+    def test_n_faces(self, side_length):
+        mesh = ugants.tests.stock.panel_mesh(side_length)
+        n_faces = mesh.face_coords.face_x.points.shape[0]
+        assert n_faces == side_length**2
+
+    @pytest.mark.parametrize("side_length", [1, 2, 4])
+    def test_n_nodes(self, side_length):
+        mesh = ugants.tests.stock.panel_mesh(side_length)
+        n_nodes = mesh.node_coords.node_x.points.shape[0]
+        assert n_nodes == (side_length + 1) ** 2
+
+    @pytest.mark.parametrize("side_length", [1, 2, 4])
+    def test_face_node_connectivity_shape(self, side_length):
+        mesh = ugants.tests.stock.panel_mesh(side_length)
+        indices = mesh.face_node_connectivity.indices
+        assert indices.shape == (side_length**2, 4)
+
+    @pytest.mark.parametrize("side_length", [1, 2, 4])
+    def test_face_node_connectivity_is_masked_array(self, side_length):
+        mesh = ugants.tests.stock.panel_mesh(side_length)
+        assert isinstance(mesh.face_node_connectivity.indices, np.ma.MaskedArray)
+
+    @pytest.mark.parametrize("side_length", [1, 2, 4])
+    def test_face_face_connectivity_shape(self, side_length):
+        mesh = ugants.tests.stock.panel_mesh(side_length)
+        face_face = mesh.face_face_connectivity
+        assert face_face.indices.shape == (side_length**2, 4)
+
+    @pytest.mark.parametrize("side_length", [2, 4])
+    def test_face_coords_exist(self, side_length):
+        mesh = ugants.tests.stock.panel_mesh(side_length)
+        assert mesh.face_coords.face_x is not None
+        assert mesh.face_coords.face_y is not None
+        assert mesh.face_coords.face_x.points.shape == (side_length**2,)
+        assert mesh.face_coords.face_y.points.shape == (side_length**2,)
+
+    @pytest.mark.parametrize("side_length", [2, 4])
+    def test_node_coords_exist(self, side_length):
+        mesh = ugants.tests.stock.panel_mesh(side_length)
+        assert mesh.node_coords.node_x is not None
+        assert mesh.node_coords.node_y is not None
+        assert mesh.node_coords.node_x.points.shape == ((side_length + 1) ** 2,)
+        assert mesh.node_coords.node_y.points.shape == ((side_length + 1) ** 2,)
+
+    def test_raises_for_zero_side_length(self):
+        expected_msg = r"^Panel side length must be positive \(requested 0\)$"
+        with pytest.raises(ValueError, match=expected_msg):
+            ugants.tests.stock.panel_mesh(0)
+
+    def test_raises_for_side_length_above_12(self):
+        expected_msg = (
+            r"^The panel mesh generator does not support "
+            r"side lengths above 12 \(requested 13\)$"
+        )
+        with pytest.raises(ValueError, match=expected_msg):
+            ugants.tests.stock.panel_mesh(13)
+
+
+class TestPanelCube:
+    """Tests for ugants.tests.stock.panel_cube."""
+
+    @pytest.mark.parametrize("side_length", [1, 2, 4])
+    def test_returns_cube(self, side_length):
+        cube = ugants.tests.stock.panel_cube(side_length)
+        assert isinstance(cube, Cube)
+
+    @pytest.mark.parametrize("side_length", [1, 2, 4])
+    def test_shape(self, side_length):
+        cube = ugants.tests.stock.panel_cube(side_length)
+        assert cube.shape == (side_length**2,)
+
+    @pytest.mark.parametrize("side_length", [1, 2, 4])
+    def test_has_mesh(self, side_length):
+        cube = ugants.tests.stock.panel_cube(side_length)
+        assert cube.mesh is not None
+        assert isinstance(cube.mesh, Mesh)
+
+    @pytest.mark.parametrize("side_length", [2, 4])
+    def test_slam_from_ugrid(self, side_length):
+        cube = ugants.tests.stock.panel_cube(side_length)
+        result = slam.Transform.from_ugrid(cube)
+        assert isinstance(result, Cube)
+        assert result.shape == (side_length, side_length)
+
+    @pytest.mark.parametrize("side_length", [2, 4])
+    def test_slam_from_ugrid_has_no_mesh(self, side_length):
+        cube = ugants.tests.stock.panel_cube(side_length)
+        result = slam.Transform.from_ugrid(cube)
+        assert result.mesh is None
+
+
+class TestCubedsphereMesh:
+    """Tests for ugants.tests.stock.cubedsphere_mesh."""
+
+    @pytest.mark.parametrize("side_length", [1, 2, 4])
+    def test_returns_mesh(self, side_length):
+        mesh = ugants.tests.stock.cubedsphere_mesh(side_length)
+        assert isinstance(mesh, Mesh)
+
+    @pytest.mark.parametrize("side_length", [1, 2, 4])
+    def test_n_faces(self, side_length):
+        """Expected number of faces is 6(side_length^2)."""
+        mesh = ugants.tests.stock.cubedsphere_mesh(side_length)
+        n_faces = mesh.face_node_connectivity.indices.shape[0]
+        assert n_faces == 6 * side_length**2
+
+    @pytest.mark.parametrize("side_length", [1, 2, 4])
+    def test_n_nodes(self, side_length):
+        """Expected number of nodes is n_faces + 2 = 6(side_length^2) + 2."""
+        mesh = ugants.tests.stock.cubedsphere_mesh(side_length)
+        n_nodes = mesh.node_coords.node_x.points.shape[0]
+        assert n_nodes == 6 * side_length**2 + 2
+
+    @pytest.mark.parametrize("side_length", [1, 2, 4])
+    def test_face_node_connectivity_shape(self, side_length):
+        mesh = ugants.tests.stock.cubedsphere_mesh(side_length)
+        indices = mesh.face_node_connectivity.indices
+        assert indices.shape == (6 * side_length**2, 4)
+
+    @pytest.mark.parametrize("side_length", [1, 2, 4])
+    def test_face_node_connectivity_is_masked_array(self, side_length):
+        mesh = ugants.tests.stock.cubedsphere_mesh(side_length)
+        assert isinstance(mesh.face_node_connectivity.indices, np.ma.MaskedArray)
+
+    @pytest.mark.parametrize("side_length", [1, 2, 4])
+    def test_face_coords_exist(self, side_length):
+        mesh = ugants.tests.stock.cubedsphere_mesh(side_length)
+        assert mesh.face_coords.face_x is not None
+        assert mesh.face_coords.face_y is not None
+        assert mesh.face_coords.face_x.points.shape == (6 * side_length**2,)
+        assert mesh.face_coords.face_y.points.shape == (6 * side_length**2,)
+
+    @pytest.mark.parametrize("side_length", [1, 2, 4])
+    def test_node_coords_exist(self, side_length):
+        mesh = ugants.tests.stock.cubedsphere_mesh(side_length)
+        assert mesh.node_coords.node_x is not None
+        assert mesh.node_coords.node_y is not None
+
+    def test_raises_for_zero_side_length(self):
+        expected_msg = r"^Cubedsphere side length must be positive \(requested 0\)$"
+        with pytest.raises(ValueError, match=expected_msg):
+            ugants.tests.stock.cubedsphere_mesh(0)
+
+    def test_raises_for_side_length_above_12(self):
+        expected_msg = (
+            r"^The cubedsphere mesh generator does not support "
+            r"side lengths above 12 \(requested 13\)$"
+        )
+        with pytest.raises(ValueError, match=expected_msg):
+            ugants.tests.stock.cubedsphere_mesh(13)
+
+
+class TestCubedsphereCube:
+    """Tests for ugants.tests.stock.cubedsphere_cube."""
+
+    @pytest.mark.parametrize("side_length", [1, 2, 4])
+    def test_returns_cube(self, side_length):
+        cube = ugants.tests.stock.cubedsphere_cube(side_length)
+        assert isinstance(cube, Cube)
+
+    @pytest.mark.parametrize("side_length", [1, 2, 4])
+    def test_shape(self, side_length):
+        cube = ugants.tests.stock.cubedsphere_cube(side_length)
+        assert cube.shape == (6 * side_length**2,)
+
+    @pytest.mark.parametrize("side_length", [1, 2, 4])
+    def test_has_mesh(self, side_length):
+        cube = ugants.tests.stock.cubedsphere_cube(side_length)
+        assert cube.mesh is not None
+        assert isinstance(cube.mesh, Mesh)
+
+    @pytest.mark.parametrize("side_length", [1, 2, 4])
+    def test_has_panel_number_coord(self, side_length):
+        cube = ugants.tests.stock.cubedsphere_cube(side_length)
+        panel_number = cube.coord("panel_number")
+        assert panel_number is not None
+        assert panel_number.points.shape == (6 * side_length**2,)
+
+    @pytest.mark.parametrize("side_length", [1, 2, 4])
+    def test_panel_number_values(self, side_length):
+        cube = ugants.tests.stock.cubedsphere_cube(side_length)
+        panel_number = cube.coord("panel_number").points
+        expected = np.repeat(np.arange(6), side_length**2)
+        np.testing.assert_array_equal(panel_number, expected)
 
 
 class TestDummyRegularMesh3x2:
@@ -24,7 +224,7 @@ class TestDummyRegularMesh3x2:
           0.0  2.5  5.0  7.5 10.0 12.5 15.0
     """
 
-    mesh = regular_lat_lon_mesh(0, 15, 0, 10, (3, 2))
+    mesh = ugants.tests.stock.regular_lat_lon_mesh(0, 15, 0, 10, (3, 2))
     face_x_points = mesh.face_coords.face_x.points
     face_y_points = mesh.face_coords.face_y.points
     node_x_points = mesh.node_coords.node_x.points
@@ -83,7 +283,7 @@ class TestDummyRegularMesh2x3:
           0.0  2.5  5.0  7.5  10.0
     """
 
-    mesh = regular_lat_lon_mesh(0, 10, 0, 15, (2, 3))
+    mesh = ugants.tests.stock.regular_lat_lon_mesh(0, 10, 0, 15, (2, 3))
     face_x_points = mesh.face_coords.face_x.points
     face_y_points = mesh.face_coords.face_y.points
     node_x_points = mesh.node_coords.node_x.points
