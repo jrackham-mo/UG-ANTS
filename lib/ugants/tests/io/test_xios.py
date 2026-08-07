@@ -92,7 +92,7 @@ class TestConvertToXIOS:
         self, cast_to_single, temporary_filepaths_function
     ):
         source_cube = ugants.tests.stock.cubedsphere_cube(4)
-        source_cube.attributes.pop("online_operation")
+        assert "online_operation" not in source_cube.attributes
         output_path = temporary_filepaths_function(suffix=".nc")
         converter = ConvertToXIOS(source_cube, cast_to_single)
         converter.output = output_path
