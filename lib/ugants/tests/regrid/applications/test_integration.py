@@ -50,7 +50,7 @@ class TestConsistentResults:
     @pytest.mark.parametrize("scheme", ["conservative", "bilinear", "nearest"])
     def test_no_tolerance(self, scheme, n_bands):
         """Test that results are consistent when no tolerance is provided."""
-        sources = CubeList([cubedsphere_cube(4)])
+        sources = CubeList([cubedsphere_cube(12)])
         for source in sources:
             source.attributes["history"] = "foo"
         target_grid = CubeList([regular_grid_global_cube(144, 192)])
