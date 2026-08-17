@@ -16,32 +16,6 @@ from iris.experimental.ugrid import Connectivity, Mesh
 from ugants.utils.cube import get_connectivity_indices
 
 
-def mesh_to_cube(mesh, dtype: np.dtype = np.float64):
-    """Turn a mesh into a :class:`iris.cube.Cube` with data using ``np.nan``.
-
-    Parameters
-    ----------
-    mesh : :class:`iris.experimental.ugrid.mesh.Mesh`
-        The mesh to be converted to an :class:`iris.cube.Cube`
-    dtype : :class:`numpy.dtype`
-        The data type used for the cube.data :class:`numpy.ndarray`, by default
-        ``np.float64``.
-
-    Returns
-    -------
-    :class:`iris.cube.Cube`
-        The providied mesh as an :class:`iris.cube.Cube`.
-    """
-    data = np.full(mesh.face_coords.face_x.shape[0], np.nan, dtype=dtype)
-    cube = Cube(data)
-
-    mesh_coordinates = mesh.to_MeshCoords("face")
-    for coord in mesh_coordinates:
-        cube.add_aux_coord(coord, 0)
-
-    return cube
-
-
 def generate_band_bounds(start: float, stop: float, n_bands: int):
     """Generate a list of tuples representing bands of latitude or longitude.
 

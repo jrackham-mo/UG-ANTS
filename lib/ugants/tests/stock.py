@@ -21,7 +21,7 @@ from iris.cube import Cube
 from iris.experimental.ugrid import Connectivity, Mesh
 from iris.tests.stock.mesh import sample_mesh, sample_mesh_cube
 
-from ugants.utils.cube import mesh2cube
+from ugants.utils.cube import mesh_to_cube
 
 from ._mesh import _polydata_to_mesh
 
@@ -54,7 +54,9 @@ def cubedsphere_cube(side_length, data=None) -> Cube:
 
     """
     mesh = cubedsphere_mesh(side_length)
-    cube = mesh2cube(mesh, data)
+    if data is None:
+        data = np.ma.arange(mesh.face_coords.face_x.shape[0], dtype=np.float64)
+    cube = mesh_to_cube(mesh, data)
     panel_number = AuxCoord(
         points=np.repeat(np.arange(6), cube.shape[0] / 6),
         long_name="panel_number",
@@ -134,7 +136,7 @@ def panel_cube(side_length, centre_lat=0, centre_lon=0, data=None) -> Cube:
 
     """
     mesh = panel_mesh(side_length, centre_lat, centre_lon)
-    cube = mesh2cube(mesh, data)
+    cube = mesh_to_cube(mesh, data)
     return cube
 
 

@@ -6,11 +6,9 @@
 import numpy as np
 import pytest
 
-from ugants.regrid.band_utils import (
-    find_cell_centres_within_latitude_bounds,
-    mesh_to_cube,
-)
+from ugants.regrid.band_utils import find_cell_centres_within_latitude_bounds
 from ugants.tests.stock import cubedsphere_cube, regular_lat_lon_mesh
+from ugants.utils.cube import mesh_to_cube
 
 
 @pytest.fixture()
